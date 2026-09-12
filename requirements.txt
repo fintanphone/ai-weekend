@@ -1,0 +1,14 @@
+# Core
+anthropic>=0.40.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Lab 4 (RAG)
+numpy>=1.26.0
+sentence-transformers>=3.0.0
+
+# Lab 6 (MCP)
+mcp>=1.2.0
+
+# Lab 8 (evals) - nice tables in the terminal
+rich>=13.0.0
