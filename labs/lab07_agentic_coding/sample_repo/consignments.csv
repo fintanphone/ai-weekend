@@ -1,0 +1,9 @@
+ref,unit_price,qty,zone
+CN-001,12.50,340,eu
+CN-002,18.75,100,eu
+CN-003,0.85,2400,domestic
+CN-004,145.00,17,non_eu
+CN-005,64.20,88,eu
+CN-006,0.06,1560,domestic
+CN-007,22.40,45,atlantic
+CN-008,38.90,100,non_eu

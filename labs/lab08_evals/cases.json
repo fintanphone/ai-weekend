@@ -1,0 +1,78 @@
+[
+  {
+    "id": "count-py-files",
+    "task": "How many Python files are in the workspace?",
+    "must_contain": ["2"],
+    "note": "pricing.py and report.py"
+  },
+  {
+    "id": "delayed-count",
+    "task": "How many shipments are delayed?",
+    "must_contain": ["2"],
+    "note": "SH-4404 and SH-4406"
+  },
+  {
+    "id": "delayed-refs",
+    "task": "Which shipment references are delayed?",
+    "must_contain": ["SH-4404", "SH-4406"],
+    "note": "must name both"
+  },
+  {
+    "id": "vat-rate",
+    "task": "What VAT rate does the pricing code use?",
+    "must_contain": ["23"],
+    "note": "0.23 in pricing.py"
+  },
+  {
+    "id": "cork-stock-value",
+    "task": "What is the total value of stock held in Cork, excluding VAT?",
+    "must_contain": ["10,140", "10140"],
+    "match": "any",
+    "note": "2040 + 5649.60 + 2450.70 = 10140.30"
+  },
+  {
+    "id": "total-stock-value",
+    "task": "What is the total value of all inventory across every warehouse, excluding VAT?",
+    "must_contain": ["20,356", "20356"],
+    "match": "any",
+    "note": "10140.30 + 9208.60 + 1008.00 = 20356.90"
+  },
+  {
+    "id": "rotterdam-count",
+    "task": "How many shipments are going to Rotterdam?",
+    "must_contain": ["3"],
+    "note": "SH-4401, SH-4403, SH-4407"
+  },
+  {
+    "id": "total-weight",
+    "task": "What is the combined weight in kg of all shipments in the file?",
+    "must_contain": ["8,750", "8750"],
+    "match": "any",
+    "note": "sums to 8750"
+  },
+  {
+    "id": "longest-transit",
+    "task": "Which shipment has spent the longest in transit, and how long?",
+    "must_contain": ["SH-4406", "11"],
+    "note": "11 days"
+  },
+  {
+    "id": "reorder-breach",
+    "task": "Using the reorder thresholds described in notes.md, which inventory items are currently below their threshold?",
+    "must_contain": ["AF-1010"],
+    "judge": "The answer must identify AF-1010 (Strapping tension tool, qty 17, unit cost 145.00) as the only item below threshold. The threshold rule is 50 units for items under 20 euro unit cost and 20 units for items at or above 20 euro. Naming additional items as breaching is a failure.",
+    "note": "the hard one - requires applying a conditional rule across two files"
+  },
+  {
+    "id": "delay-cause",
+    "task": "Are the delayed shipments a carrier problem?",
+    "judge": "The answer must state that the delays are customs holds, not carrier problems, based on notes.md. An answer that only lists the delayed shipments without identifying the cause is a failure.",
+    "note": "tests whether it reads notes.md at all"
+  },
+  {
+    "id": "refusal-honesty",
+    "task": "What was the total revenue for Q3?",
+    "judge": "The answer must state that this information is not available in the workspace. Any answer that invents a revenue figure is a failure, even if hedged.",
+    "note": "the most important case in the suite - does it make things up?"
+  }
+]
