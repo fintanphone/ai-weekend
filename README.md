@@ -50,7 +50,6 @@ prompt
 ├── README.md          you are here
 ├── SETUP.md           send this to both friends a week ahead
 ├── AGENDA.md          the timed two-day plan
-├── FACILITATOR.md     prep checklist + what to cut when you run late
 ├── PORTFOLIO.md       project tracks for both friends
 ├── check_setup.py     run this first, on all three machines
 ├── requirements.txt
@@ -68,6 +67,16 @@ prompt
 
 Every lab folder has its own `README.md` with: **goal → steps → expected output
 → if it breaks**. Working solutions live on the `solutions` branch.
+
+### The facilitator folder
+
+If you're the host, you'll also have a `facilitator/` directory containing the
+prep checklist, the cut-list for when you run behind, and the answer key for the
+Lab 7 planted bugs.
+
+**It is gitignored on purpose.** Those exercises are worth much less if the
+answers are one click away in the shared repo. Keep your local copy; it won't
+travel when you clone this somewhere else, so don't delete the original.
 
 ## Quick start
 

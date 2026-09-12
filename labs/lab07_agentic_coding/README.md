@@ -91,28 +91,16 @@ Non-negotiable habit. Work on a branch, commit before you let an agent loose,
 and be willing to throw the whole thing away. Agent work is cheap to redo and
 expensive to half-review.
 
----
 
-## Facilitator answer key
+## If they stall
 
-**Don't read this section out.** Use it to steer if they stall, and to check
-what the agent missed.
+There is an answer key in `facilitator/LAB07-ANSWERS.md`, which is deliberately
+kept out of the shared repo. Five bugs are planted at graded difficulty. Two of
+them an agent finds in seconds; one only appears if you look at the data rather
+than the code; one needs careful reading of the README's ordering.
 
-| # | Bug | Difficulty for an agent |
-|---|---|---|
-| 1 | `apply_bulk_discount` uses `qty > 100`; README says 100 **or more**. CN-002 and CN-008 are exactly 100 and get no discount | Easy — usually found immediately |
-| 2 | `zone_surcharge` silently returns 0% for an unknown zone. CN-007 has zone `atlantic`, which isn't in the dict, so it's undercharged with no error | Medium — needs it to look at the *data*, not just the code |
-| 3 | `build_invoice` has a mutable default argument `lines=[]`. Call it twice and the second invoice contains the first one's lines | Medium — a classic, usually spotted, but its *impact* is often understated |
-| 4 | Handling fee is added before the fuel levy is applied, so the levy is charged on handling. README says the levy applies to the total "including surcharge" — not handling | Hard — requires careful reading of the README's ordering |
-| 5 | `float` used for currency throughout; `invoice_total` accumulates rounding error | Hard — often mentioned as a general concern rather than demonstrated |
-
-Bug 2 is the most instructive one. An agent reading only the code sees a
-reasonable-looking default. It only becomes a bug when you look at
-`consignments.csv` and notice a zone that isn't in the dictionary. **Ask them:
-what would have made the agent find it?** (Answer: telling it to run the code on
-the real data, not just read it.)
-
----
+Resist handing out the list. The exercise is worth far more if they find four
+and miss one than if they check their work against a table.
 
 ## Discussion (15 min)
 

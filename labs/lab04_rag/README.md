@@ -1,6 +1,6 @@
 # Lab 4 — RAG, and Watching It Fail
 
-**75 minutes · pairs · first on the cut-list, see `FACILITATOR.md`**
+**75 minutes · pairs · first on the cut-list, see the facilitator notes**
 
 ## Goal
 

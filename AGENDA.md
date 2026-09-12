@@ -4,7 +4,7 @@ Two days, roughly 10:00–17:30 each. Times are deliberately generous. Everythin
 takes twice as long with an audience, and the conversations that break out
 mid-lab are usually more valuable than finishing on schedule.
 
-**Read `FACILITATOR.md` before Saturday.** It has the cut-list for when you run
+**Read `facilitator/FACILITATOR.md` before Saturday.** It has the cut-list for when you run
 behind, and you will run behind.
 
 ---
