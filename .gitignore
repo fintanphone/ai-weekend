@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+wheels/
+*.db
+.embeddings_cache/
+results/
+results.json
+bench_results.json
+workspace/
+
+# Facilitator-only material: cut-list and Lab 7 answer key.
+# Kept local so the shared repo doesn't spoil the exercises.
+facilitator/
