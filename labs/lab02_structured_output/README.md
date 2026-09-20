@@ -2,8 +2,10 @@
 
 **45 minutes · pairs**
 
-Two scripts: `structured.py` runs against the API model, `structured_local.py`
-runs the identical task on your own GPU.
+Three files. `tickets.py` holds the test data, schema and scoring;
+`structured.py` runs against the API model and `structured_local.py` runs the
+identical task on your own GPU. Sharing the ticket module is what makes the two
+sets of numbers directly comparable.
 
 ## Goal
 
@@ -29,6 +31,36 @@ Method B isn't a different prompt. It's a different contract.
 
 ## Steps
 
+### 0. The tickets come in two tiers
+
+```bash
+python -c "import tickets; [print(t['id'], '| tier', t['tier'], '|', t['traps']) for t in tickets.TICKETS]"
+```
+
+**Tier 1** is clean: one sender, one company, an explicit reference, a severity
+the customer more or less states. Any capable model scores 100%. These exist so
+the lab opens with something that works.
+
+**Tier 2** is where the teaching happens. Six tickets, each setting one specific
+trap:
+
+| Ticket | The trap |
+|---|---|
+| `t4-two-companies` | Three companies named; the writer's isn't the most prominent |
+| `t5-mentioned-person` | A colleague is named before the signature |
+| `t6-tone-vs-impact` | Customer insists it's "NOT URGENT" while describing a site-wide outage |
+| `t7-false-reference` | An invoice number and an error code shaped like ticket references |
+| `t8-quoted-thread` | A closed ticket's reference quoted below the new issue |
+| `t9-relayed` | Written by an account manager on a client's behalf |
+
+Every tier-2 answer is unambiguous to a careful human, because the three
+extraction rules are stated explicitly in `RULES` and repeated in the schema
+descriptions. The model gets those rules too. It is the model that finds these
+hard, not the task that is unfair.
+
+Read two or three of them before running anything, and decide what *you* think
+the right answer is. You'll be a better judge of the output for it.
+
 ### 1. Read the code first
 
 ```bash
@@ -47,10 +79,11 @@ Fifteen minutes, together, before running anything. Find these three things:
 ### 2. Run it
 
 ```bash
-python structured.py --trials 5
+python structured.py --trials 3
+python structured.py --tier 2 --misses
 ```
 
-Costs a few cents. Look at the pass rates and the failure reasons.
+Costs a few cents. The `--misses` flag names which trap caught it.
 
 ### 3. Turn the pressure up
 
@@ -79,10 +112,15 @@ Lab 8.
 ### 5. Now do it on your own GPU
 
 ```bash
-python structured_local.py --trials 3
+python structured_local.py --trials 3 --label "27B IQ3_M"
 ```
 
-Same three tickets, same schema, running against the models you pulled in Lab 1.
+Same three tickets, same schema, running against whatever local server is up.
+The script detects llama.cpp or Ollama automatically and prints what it found,
+including **which `response_format` shape your build actually honours** — worth
+pausing on, because "OpenAI-compatible" turns out to be a spectrum rather than a
+standard, and different llama.cpp builds accept different shapes.
+
 This adds a third method the cloud version doesn't have:
 
 **C. Constrained decoding.** Ollama takes your JSON Schema and compiles it into
@@ -110,9 +148,26 @@ incident you discover three months later.
 Some things to try:
 
 ```bash
-python structured_local.py --model llama3.2:3b --show    # watch it go wrong
-python structured_local.py --model qwen3:14b --trials 5  # does size fix it?
+python structured_local.py --tier 2 --misses     # the interesting half
+python structured_local.py --show                # every parsed object
+python structured_local.py --trials 8            # tighter numbers
 ```
+
+If tier 1 comes back at 100% across all three methods, that's expected on a
+large model and not a sign the lab is broken — it means the ceiling is higher
+than the easy tickets can measure. Go straight to `--tier 2`.
+
+**On llama.cpp you test one model at a time**, since `llama-server` holds a
+single GGUF. Run it, restart the server with a different quant or model, run it
+again with a new `--label`, then:
+
+```bash
+python structured_local.py --compare
+```
+
+Each cell shows `valid% / fields-right%`. Watching a heavier quant hold shape
+just as well but get more fields right is the clearest possible illustration of
+the two columns measuring different things.
 
 Then run `python structured.py` again and compare the API model's numbers
 against the best local result. That comparison is the argument for why Labs 3
@@ -156,19 +211,35 @@ the loop.
 The model returned a text block instead of a tool call. If `tool_choice` is set
 correctly this shouldn't happen — check you didn't edit that line.
 
-**`structured_local.py`: cannot reach localhost:11434**
-Ollama isn't running. `ollama serve`, or start the desktop app.
+**`No local model server found`**
+Nothing is listening. Check `LOCAL_API_BASE` in `.env` matches your server's
+port, then run `python ../common/local_backend.py` to see what's detectable.
 
-**`structured_local.py`: method C says "no tool support"**
-Expected for some models. Ollama returns a 400 for models without a tool
-template, and the script reports it rather than crashing. Methods A and B still
-run, and B is the one that matters here.
+**`schema support: NONE`**
+Run the diagnostic, which shows what each path actually did:
 
-**`structured_local.py`: method B errors on the schema**
-Older Ollama builds don't handle the union type `["string", "null"]` on
-`reference_id`. Upgrade Ollama, or change that line to a plain `"string"` and
-accept `""` as "no reference" — the scoring already treats empty, `none` and
-`n/a` as absent.
+```bash
+python ../common/local_backend.py
+```
+
+It tries five paths in order — four `response_format` shapes on
+`/v1/chat/completions`, then llama.cpp's native `/completion` endpoint with
+`json_schema`, which is older and more reliable than the OpenAI shim. For each
+it reports one of: *rejected* (a 400, with the server's message), *accepted but
+unconstrained* (the shape was ignored — a known llama.cpp issue), or *WORKS*.
+
+If everything says "accepted but unconstrained" and native fails too, your build
+genuinely can't constrain output. Method B is skipped; A and C still run.
+
+**Method C says "unsupported"**
+The model has no tool template, or the server was started without `--jinja`.
+On llama.cpp, add `--jinja`. Methods A and B still run, and B is the one that
+carries the lesson.
+
+**Everything is slow and the output has a reasoning preamble**
+Hybrid-reasoning models default to thinking ON. The script asks for it off per
+call, but you can also set `--reasoning-budget 0` on the server. The parser
+strips `</think>` blocks either way.
 
 ## Takeaway
 

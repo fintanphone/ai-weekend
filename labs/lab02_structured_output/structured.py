@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Lab 2 — turning a model into a software component.
 
-Two ways to get structured data out of a model, compared head to head:
+Two ways to get structured data out of an API model, compared head to head:
 
   A. Ask nicely in the prompt, then parse.       (fragile)
   B. Define a schema and force a tool call.      (reliable)
 
-    python structured.py               # run both, 5 trials each
-    python structured.py --trials 20   # more trials, sharper contrast
+    python structured.py                 # both, 3 trials each
+    python structured.py --tier 2        # only the ambiguous tickets
+    python structured.py --trials 10     # sharper contrast
+    python structured.py --misses        # show which trap caught it
+
+Tickets, schema and scoring live in tickets.py, shared with
+structured_local.py so the API and local numbers are directly comparable.
 """
 
 import argparse
@@ -17,40 +22,17 @@ import os
 import anthropic
 from dotenv import load_dotenv
 
+import tickets as T
+
 load_dotenv()
 
 MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
 client = anthropic.Anthropic()
 
-TICKETS = [
-    """Hi, this is Dervla Nolan from Aurora Freight. Our API integration started
-    returning 502s at about 14:30 yesterday. It's blocking our overnight customs
-    filing so it's pretty urgent. Ref AF-7741.""",
-    """morning - dashboard colours look a bit off on the new release? not a big
-    deal, just flagging. tom @ Kestrel Analytics""",
-    """URGENT URGENT our entire production database is unreachable, every
-    customer is down, we are losing money by the minute. Priya Raghavan,
-    Meridian Health. This is ticket MH-0031 I think.""",
-]
-
-# The schema both methods are trying to satisfy.
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "customer_name": {"type": "string", "description": "Full name of the person who wrote in"},
-        "company": {"type": "string"},
-        "issue_summary": {"type": "string", "description": "One sentence, factual, no speculation"},
-        "severity": {
-            "type": "string",
-            "enum": ["low", "medium", "high", "critical"],
-            "description": "critical means production is down for all users",
-        },
-        "reference_id": {
-            "type": ["string", "null"],
-            "description": "Ticket reference if the customer gave one, otherwise null",
-        },
-    },
-    "required": ["customer_name", "company", "issue_summary", "severity", "reference_id"],
+TOOL = {
+    "name": "record_ticket",
+    "description": "Record a parsed support ticket in the tracking system.",
+    "input_schema": T.SCHEMA,
 }
 
 
@@ -58,30 +40,20 @@ SCHEMA = {
 # Method A — ask in the prompt
 # --------------------------------------------------------------------------
 
-PROMPT_A = """Extract the details from this support ticket as JSON.
-
-Return ONLY a JSON object with keys: customer_name, company, issue_summary,
-severity (one of: low, medium, high, critical), reference_id (or null).
-No markdown, no code fences, no explanation.
-
-Ticket:
-{ticket}"""
-
-
-def method_a(ticket: str) -> dict | None:
+def method_a(text: str):
     resp = client.messages.create(
-        model=MODEL,
-        max_tokens=500,
-        messages=[{"role": "user", "content": PROMPT_A.format(ticket=ticket)}],
+        model=MODEL, max_tokens=600,
+        messages=[{"role": "user",
+                   "content": T.PROMPT_A.format(rules=T.RULES, ticket=text)}],
     )
-    text = "".join(b.text for b in resp.content if b.type == "text").strip()
+    out = "".join(b.text for b in resp.content if b.type == "text").strip()
 
     # The defensive cleanup every codebase ends up with. This is the smell.
-    if text.startswith("```"):
-        text = text.split("```")[1].removeprefix("json").strip()
+    if out.startswith("```"):
+        out = out.split("```")[1].removeprefix("json").strip()
 
     try:
-        return json.loads(text)
+        return json.loads(out)
     except json.JSONDecodeError:
         return None
 
@@ -90,22 +62,14 @@ def method_a(ticket: str) -> dict | None:
 # Method B — declare a tool, force the call
 # --------------------------------------------------------------------------
 
-TOOL = {
-    "name": "record_ticket",
-    "description": "Record a parsed support ticket in the tracking system.",
-    "input_schema": SCHEMA,
-}
-
-
-def method_b(ticket: str) -> dict | None:
+def method_b(text: str):
     resp = client.messages.create(
-        model=MODEL,
-        max_tokens=500,
-        tools=[TOOL],
-        # This is the whole trick: the model MUST call this tool, and the API
-        # validates its arguments against the schema before you ever see them.
+        model=MODEL, max_tokens=600, tools=[TOOL],
+        # The whole trick: the model MUST call this tool, and the API validates
+        # its arguments against the schema before you ever see them.
         tool_choice={"type": "tool", "name": "record_ticket"},
-        messages=[{"role": "user", "content": f"Parse this support ticket:\n\n{ticket}"}],
+        messages=[{"role": "user",
+                   "content": f"{T.RULES}\n\nParse this support ticket:\n\n{text}"}],
     )
     for block in resp.content:
         if block.type == "tool_use":
@@ -113,54 +77,75 @@ def method_b(ticket: str) -> dict | None:
     return None
 
 
-# --------------------------------------------------------------------------
-
-def validate(obj) -> tuple[bool, str]:
-    """Would this actually survive contact with a downstream system?"""
-    if obj is None:
-        return False, "unparseable"
-    missing = set(SCHEMA["required"]) - set(obj.keys())
-    if missing:
-        return False, f"missing {sorted(missing)}"
-    if obj.get("severity") not in ["low", "medium", "high", "critical"]:
-        return False, f"bad severity: {obj.get('severity')!r}"
-    return True, "ok"
+METHODS = [("A: prompt-based", method_a), ("B: tool schema", method_b)]
 
 
-def run(trials: int) -> None:
-    print(f"\nModel: {MODEL}   Tickets: {len(TICKETS)}   Trials each: {trials}\n")
+def run(trials: int, tier: str, misses: bool) -> None:
+    cases = T.select(tier)
+    tiers = sorted({c["tier"] for c in cases})
+    print(f"\n  model {MODEL}   tickets {len(cases)} (tier {tier})   trials {trials}\n")
 
-    for label, fn in [("A: prompt-based", method_a), ("B: tool schema", method_b)]:
-        passes, failures = 0, []
-        total = len(TICKETS) * trials
+    header = f"  {'method':<18} {'valid':>13} {'fields right':>14}"
+    for ti in tiers:
+        header += f" {'tier ' + str(ti):>9}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))
 
-        for ticket in TICKETS:
+    all_misses = []
+    for name, fn in METHODS:
+        valid = attempts = got = possible = 0
+        per_tier = {ti: [0, 0] for ti in tiers}
+
+        for case in cases:
             for _ in range(trials):
+                attempts += 1
                 try:
-                    result = fn(ticket)
+                    result = fn(case["text"])
                 except Exception as exc:  # noqa: BLE001
-                    failures.append(f"{type(exc).__name__}")
+                    all_misses.append((name, case["id"], type(exc).__name__))
                     continue
-                ok, reason = validate(result)
-                if ok:
-                    passes += 1
-                else:
-                    failures.append(reason)
 
-        pct = 100 * passes / total if total else 0
-        print(f"{label:<18} {passes}/{total} valid  ({pct:.0f}%)")
-        if failures:
-            for reason in sorted(set(failures)):
-                print(f"{'':<18}   ↳ {reason} × {failures.count(reason)}")
-        print()
+                if T.is_valid(result):
+                    valid += 1
+                s, total, wrong = T.accuracy(result, case["expect"])
+                got += s
+                possible += total
+                per_tier[case["tier"]][0] += s
+                per_tier[case["tier"]][1] += total
+                for w in wrong:
+                    all_misses.append((name, case["id"], w))
 
-    print("Now look at one actual result from each method:\n")
-    print("A:", json.dumps(method_a(TICKETS[2]), indent=2))
-    print("\nB:", json.dumps(method_b(TICKETS[2]), indent=2))
+        vpct = 100 * valid / attempts if attempts else 0
+        apct = 100 * got / possible if possible else 0
+        row = f"  {name:<18} {valid}/{attempts} ({vpct:>3.0f}%)".ljust(34)
+        row += f"{got}/{possible} ({apct:>3.0f}%)".rjust(14)
+        for ti in tiers:
+            g, p = per_tier[ti]
+            row += f" {(100 * g / p if p else 0):>8.0f}%"
+        print(row)
+
+    if misses and all_misses:
+        print("\n  \033[93mwhat went wrong\033[0m")
+        seen = {}
+        for method, cid, what in all_misses:
+            seen.setdefault((method, cid), []).append(what)
+        for (method, cid), whats in sorted(seen.items()):
+            case = next(c for c in cases if c["id"] == cid)
+            print(f"    {method:<18} {cid:<20} {max(set(whats), key=whats.count)}")
+            print(f"    {'':<18} \033[90mtrap: {case['traps']}\033[0m")
+
+    print("""
+  Method B cannot produce a malformed record — the API validates arguments
+  against the schema first. It can still produce a WRONG one. Compare the
+  tier 2 column against tier 1 to see the difference, then run
+  structured_local.py and compare against your own GPU.
+""")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--trials", type=int, default=5)
+    ap.add_argument("--trials", type=int, default=3)
+    ap.add_argument("--tier", default="all", choices=["1", "2", "all"])
+    ap.add_argument("--misses", action="store_true")
     args = ap.parse_args()
-    run(args.trials)
+    run(args.trials, args.tier, args.misses)

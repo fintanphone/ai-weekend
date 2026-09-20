@@ -56,11 +56,23 @@ every local model you'll ever run is quantised.**
 ### 3. Benchmark
 
 ```bash
-python bench.py
+python bench.py --label "27B IQ3_M"
 ```
 
-Three models, three sizes. Record the numbers — you'll want them in Lab 8 when
-you compare against API costs.
+The script detects whichever backend is running. **On llama.cpp you benchmark
+one model at a time** — `llama-server` holds a single GGUF — so the workflow is:
+run it, restart the server with a different model or quant, run it again, then:
+
+```bash
+python bench.py --compare
+```
+
+Results accumulate in `bench_results.json`, so the comparison survives the
+restarts. On Ollama you can loop in one go with
+`--models qwen3:8b,llama3.2:3b`.
+
+Record the numbers — you'll want them in Lab 8 when you compare against API
+costs.
 
 Two metrics that matter and get conflated constantly:
 
@@ -90,11 +102,13 @@ collapses — often by 10x or more. There's no error. It just gets slow.
 ### 5. The JSON test — the important bit
 
 ```bash
-python bench.py --json-test --trials 5
+python bench.py --json-test --trials 5 --label "27B IQ3_M"
 ```
 
-Same task, three model sizes, five attempts each. Count how often each returns
-parseable JSON with all the required fields.
+Same task, five attempts, counting how often you get parseable JSON with all
+the required fields. **No schema constraint here** — this is the model unaided,
+which is the honest baseline. Lab 2b turns the constraint on and the difference
+is dramatic.
 
 ## Expected output
 
@@ -115,11 +129,18 @@ Nothing will be perfect, and **that's the lesson.**
 
 ## If it breaks
 
-**`ConnectionError` / can't reach localhost:11434**
-Ollama isn't running. Start it with `ollama serve`, or launch the desktop app.
+**No local model server found**
+Nothing is listening. Start `llama-server` (or `ollama serve`) and check
+`LOCAL_API_BASE` in `.env` matches the port. Run
+`python ../common/local_backend.py` to see what the labs can detect.
 
-**404 model not found**
+**404 model not found (Ollama)**
 `ollama pull <model>`. These are multi-GB, so ideally do this before Saturday.
+
+**Throughput looks absurdly low on a hybrid-reasoning model**
+It's thinking. Qwen3.x and similar default to reasoning ON, which burns a large
+number of tokens before answering. The labs request thinking off per call; you
+can also set `--reasoning-budget 0` on the server.
 
 **Everything is absurdly slow, GPU shows 0% utilisation**
 It's running on CPU. Check `nvidia-smi` sees the card at all, then check your
