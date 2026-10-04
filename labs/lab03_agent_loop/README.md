@@ -2,6 +2,11 @@
 
 **90 minutes · pairs · the centrepiece of the weekend**
 
+**New to this? Start in [`walkthrough/`](walkthrough/).** A real task on a fake
+Raspberry Pi — find the largest .tmp file in a home directory and delete it —
+built up from one exchange to a complete loop across four small programs. Step
+through them in a debugger before opening `agent.py`.
+
 ## Goal
 
 Write an agent from scratch, with no framework, and watch the mystery evaporate.

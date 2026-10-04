@@ -2,7 +2,12 @@
 
 **45 minutes · pairs**
 
-Three files. `tickets.py` holds the test data, schema and scoring;
+**New to reading Python? Start in [`walkthrough/`](walkthrough/).** Three small
+programs — one per method — built to be stepped through line by line in a
+debugger before you touch anything else. No loops, no functions, one idea per
+line. Do those first; the rest of this page assumes them.
+
+Then three files here. `tickets.py` holds the test data, schema and scoring;
 `structured.py` runs against the API model and `structured_local.py` runs the
 identical task on your own GPU. Sharing the ticket module is what makes the two
 sets of numbers directly comparable.
@@ -62,6 +67,10 @@ Read two or three of them before running anything, and decide what *you* think
 the right answer is. You'll be a better judge of the output for it.
 
 ### 1. Read the code first
+
+If you've come through [`walkthrough/`](walkthrough/) you already know the shape
+of all three methods, and this file will read as the same ideas wearing a loop
+and a scoring function.
 
 ```bash
 cat structured.py

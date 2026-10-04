@@ -114,8 +114,34 @@ them hard.
 
 ## Running the room
 
-Fifteen minutes reading the code together before anything executes. This matters
-— if they run it first they'll watch output scroll past and learn nothing.
+**Start in `walkthrough/`, on one screen, with a debugger open.** Three small
+programs — one per method — designed to be stepped through line by line. No
+loops, no functions of our own, one idea per line, so the Variables pane carries
+the explanation. Budget twenty minutes for all three.
+
+`walkthrough/README.md` has the Eclipse setup, which keys to press, and what to
+say at each stopping point. The short version: F6 steps over, and never press F5
+on the `requests.post` line or you'll end up inside the HTTP library.
+
+**Read the "thinking-mode trap" section of that README before the day.** On a
+hybrid reasoning model like Qwen 3.6, an unconstrained call will happily spend
+its entire token budget on an internal monologue and hand you back an empty
+`content` field — a baffling result that looks like a broken lab. The programs
+switch thinking off and explain why, but you want to have met it before you
+meet it in front of an audience.
+
+Also expect step 1 to **succeed** on a 27B model. That's fine and the program
+handles it: the framing becomes "it worked — now what *made* it work?" Answer:
+nothing did. A probability is not a guarantee, and it will pass every test you
+write before failing at 3am.
+
+Do this even if — especially if — your audience is new to reading Python. The
+three real lab files have a loop, a scoring function and a backend adapter in
+the way. That's the right shape for measuring and the wrong shape for a first
+look.
+
+Then fifteen minutes reading `structured.py` together before anything executes.
+Coming from the walkthrough it reads as the same three ideas wearing a loop.
 
 Then the local run on the GPU, which adds a third method the API can't
 demonstrate: **constrained decoding**, where the server compiles the schema into

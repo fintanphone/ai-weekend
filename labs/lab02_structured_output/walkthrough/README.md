@@ -81,15 +81,27 @@ perfectly well outside a debugger too — just `python step1_prompt.py`. Set
 > once and you'd have seen none of them. This is the shape of every reply
 > you'll ever get back."
 
-**Section 6** — the payoff. `repr(reply_text)` shows the preamble and the code
-fences. Then `json.loads` fails.
+**Section 3** also has the two lines that switch the model's thinking mode off.
+Don't skip past them — see *The thinking-mode trap* below, because you will
+almost certainly meet it.
 
-> "The model was *helpful*. It said 'Here you go:' and wrapped the answer neatly
-> in a code fence. And that helpfulness broke our program."
+**Section 6** — the payoff, and it has three possible endings. The program
+diagnoses which one you got, so whatever happens you have something to teach:
 
-Run it three or four times. Sometimes it parses, sometimes it doesn't. **That
-inconsistency is the lesson** — a bug that happens every time gets found in
-testing; a bug that happens sometimes gets found in production.
+| Outcome | What to say |
+|---|---|
+| Clean JSON, parses fine | "Resist being pleased. What *made* it work? Nothing did." |
+| JSON with a preamble or ```fences | "The model was *helpful*, and the helpfulness broke our program." |
+| Empty, `finish_reason: length` | The thinking-mode trap. See below. |
+
+**On a 27B model the first outcome is the likely one**, and that's fine — the
+lesson is not "it always fails", it's "nothing guarantees it". Push on that:
+
+> "It complied because it felt like it. That's a probability, not a guarantee.
+> And a probability passes all your testing and then fails at 3am, differently
+> each time."
+
+Run it four or five times so they see for themselves whether it's stable.
 
 ### step2_schema.py
 
@@ -147,6 +159,47 @@ Then the bridge:
 > "Now imagine we actually did the thing, sent the result back, and asked what
 > to do next. And again, until it stopped asking. That's tomorrow afternoon.
 > That's what 'agent' means — and you've now seen every moving part."
+
+## The thinking-mode trap
+
+Worth reading before you run anything, because it produces a baffling result
+and it is not a bug in the lab.
+
+Qwen 3.6 and models like it are **hybrid reasoning** models. Left to themselves
+they write out a long internal monologue before answering — hundreds of tokens
+of "let me consider this carefully" — and only then produce the answer. On
+llama.cpp that monologue arrives in a **separate `reasoning_content` field**,
+and `content` stays empty until the thinking is done.
+
+So if the monologue runs past `max_tokens`, you get back:
+
+```
+"finish_reason": "length"
+"content": ""
+"reasoning_content": "Thinking Process: 1. Analyze the request... Result:\n{"
+```
+
+Cut off at the exact moment it was about to answer. `content` is empty, the
+parse fails, and nothing about the error tells you why.
+
+The three programs switch thinking off with two lines in the request body:
+
+```python
+request_body["chat_template_kwargs"] = {"enable_thinking": False}
+request_body["reasoning_budget"] = 0
+```
+
+Different builds want different spellings, so they send both. **This is worth
+showing rather than hiding**, for two reasons. It's a real thing you have to
+know to get reliable output from this model family at all — and it is the same
+failure mode, in miniature, that the Lab 1 and Lab 2 adapters had to handle.
+
+Step 1 prints `reasoning_content` if it comes back non-empty. If you see
+anything there, the flags didn't take on your server — raise `max_tokens` to
+2000 and the model will finish thinking and then answer, slowly.
+
+You can also set `--reasoning-budget 0` on `llama-server` itself and skip the
+per-request flags entirely.
 
 ## Before you start
 

@@ -142,8 +142,16 @@ request_body = {}
 request_body["model"] = "local-model"
 request_body["messages"] = messages_list
 request_body["temperature"] = 0.0
-request_body["max_tokens"] = 300
+request_body["max_tokens"] = 800
 request_body["response_format"] = response_format      # <-- the only difference
+
+# --- turn the model's "thinking mode" off (same as step 1) ------------------
+# Hybrid reasoning models write a long internal monologue before answering
+# unless you tell them not to. See step 1, section 3, for why that matters.
+
+request_body["chat_template_kwargs"] = {"enable_thinking": False}
+request_body["reasoning_budget"] = 0
+
 
 print("THE REQUEST BODY")
 print()

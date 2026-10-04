@@ -65,25 +65,43 @@ claude --version
 
 Docs: <https://docs.claude.com/en/docs/claude-code/overview>
 
-## 5. Install Ollama
+## 5. A local model server — host only
 
-Used in Lab 1 for local inference. Download from <https://ollama.com/download>.
+Labs 1 and 2b talk to a local model. They auto-detect the backend, so either
+of these works and you don't need both.
 
-```bash
-ollama --version
+**llama.cpp (`llama-server`).** If you already run one, you're done. Set the
+port in `.env`:
+
+```
+LOCAL_API_BASE=http://localhost:8080
 ```
 
-**Host only** — pre-pull the models, since these are multi-GB downloads:
+Two flags matter for the labs. `--jinja` enables tool calling, and for
+extraction and tool use you want thinking **off** on hybrid-reasoning models —
+the labs request that per-call, but setting `--reasoning-budget 0` on the server
+saves a lot of wasted tokens.
+
+**Ollama.** Simpler if you don't already have a llama.cpp build.
 
 ```bash
 ollama pull llama3.2:3b        # ~2GB   deliberately too small, for contrast
 ollama pull qwen3:8b           # ~5GB   the workhorse
 ollama pull qwen3:14b          # ~9GB   pushes a 12-16GB card
-ollama pull nomic-embed-text   # ~275MB embeddings
 ```
 
-Friends can skip the pulls — Lab 1 runs on the host's GPU machine with everyone
-watching, since that's where the interesting hardware is.
+Friends can skip this entirely. Labs 1 and 2b run on the host's GPU machine with
+everyone watching, since that's where the interesting hardware is.
+
+To check what the labs can see — backend, model, constrained output and tool
+calling, with the reason for anything that fails:
+
+```bash
+python labs/common/local_backend.py
+```
+
+Run this before Saturday. It's the single most useful thing to check, because
+the constrained-output path varies between llama.cpp builds.
 
 ## 6. Verify
 

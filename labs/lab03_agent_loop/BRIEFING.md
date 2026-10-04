@@ -88,7 +88,26 @@ answer. This is also the habit that makes Lab 7 and Lab 8 make sense.
 
 ## Running the room
 
-Twenty minutes reading `agent.py` in pairs before running it. Give them the five
+**Start in `walkthrough/`, on one screen, with a debugger open.** Four small
+programs that build the loop from a single exchange: one turn by hand, then the
+whole task longhand, then the same thing as a while-loop, then a human approval
+gate. Budget thirty-five minutes.
+
+The task is a real one — SSH to a Raspberry Pi, find the largest `.tmp` file in
+the home directory, delete it — running against a fake Pi folder so nothing
+real is at risk. `walkthrough/README.md` has the script.
+
+**Step 2 is the one that matters.** It writes out three nearly-identical turns
+on purpose. By the third block the room should be mildly irritated, and that
+irritation is what makes step 3's loop feel like an obvious tidy-up rather than
+a trick. Don't skip ahead to the loop — the design depends on earning it.
+
+Two things to put on the board before you start, because the task wording hides
+them: the model never logs in (your code does, with credentials it never sees),
+and it never changes directory (there's no shell session, so "home directory" is
+a parameter, not a step). Four human steps collapse into two tool calls.
+
+Then twenty minutes reading `agent.py` in pairs before running it. Give them the five
 things to find — tool schemas, dispatch dict, containment check, the append
 line, the exit condition — and have each pair explain one back to the group.
 

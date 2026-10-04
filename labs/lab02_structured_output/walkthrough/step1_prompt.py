@@ -102,7 +102,20 @@ request_body = {}
 request_body["model"] = "local-model"      # llama.cpp ignores this, but the API wants it
 request_body["messages"] = messages_list
 request_body["temperature"] = 0.0          # 0.0 = as predictable as possible
-request_body["max_tokens"] = 300
+request_body["max_tokens"] = 800
+
+# --- turn the model's "thinking mode" off -----------------------------------
+# Qwen 3.6 and models like it are HYBRID REASONING models. Left alone they
+# write out a long internal monologue before answering - hundreds of tokens of
+# "let me consider this carefully" - and only then produce the answer.
+#
+# That is useful for hard problems. For pulling three fields out of a ticket it
+# is a waste of time and money, and if the monologue runs past max_tokens you
+# get back nothing at all. These two lines switch it off. Different servers
+# want different spellings, so we send both.
+
+request_body["chat_template_kwargs"] = {"enable_thinking": False}
+request_body["reasoning_budget"] = 0
 
 print("THE REQUEST BODY, AS JSON")
 print()
@@ -146,6 +159,27 @@ first_choice = choices_list[0]               # we only asked for one
 message_object = first_choice["message"]     # the assistant's message
 reply_text = message_object["content"]       # the actual words
 
+# Why the model stopped. "stop" = it finished naturally. "length" = it hit our
+# max_tokens cap and was cut off mid-sentence. Always worth checking.
+finish_reason = first_choice.get("finish_reason")
+
+print("Why the model stopped :", finish_reason)
+print()
+
+# Some servers put the model's internal monologue in its own field. If thinking
+# was switched off this will be empty - but if it is NOT empty, that tells you
+# the flags in section 3 did not take effect on this server.
+thinking = message_object.get("reasoning_content")
+
+if thinking:
+    print("The model also produced", len(thinking), "characters of private")
+    print("thinking, in a separate 'reasoning_content' field. Here is the start:")
+    print()
+    print("   " + repr(thinking[:160]) + " ...")
+    print()
+    print("That is its scratchpad, not its answer. It is NOT in 'content'.")
+    print()
+
 print("JUST THE TEXT THE MODEL PRODUCED")
 print()
 print(repr(reply_text))                      # repr() shows hidden characters
@@ -166,39 +200,79 @@ parsed = None
 
 try:
     parsed = json.loads(reply_text)
-    print("SUCCESS - we now have real data:")
-    print()
-    print("   customer_name :", parsed["customer_name"])
-    print("   company       :", parsed["company"])
-    print("   severity      :", parsed["severity"])
 
 except json.JSONDecodeError as error:
     print("FAILED - that string was not valid JSON.")
     print()
     print("   Python said:", error)
     print()
-    print("   This is the whole problem with Method A. The model was helpful")
-    print("   in a way that broke our program.")
 
-pause("Run this file a few more times. Do you always get the same result?")
+    # There are three different ways this goes wrong, and they need three
+    # different fixes. Work out which one we just hit.
+
+    if finish_reason == "length":
+        print("   DIAGNOSIS: truncation.")
+        print("   finish_reason is 'length', so the model was cut off before it")
+        print("   finished. Either max_tokens is too small, or thinking mode is")
+        print("   still on and the monologue ate the whole budget.")
+        print("   FIX: raise max_tokens, and check the two flags in section 3.")
+
+    elif reply_text.strip() == "":
+        print("   DIAGNOSIS: empty reply.")
+        print("   The 'content' field came back blank. If 'reasoning_content'")
+        print("   above was full, the model spent its whole turn thinking.")
+        print("   FIX: the two flags in section 3 did not take on this server.")
+
+    elif "{" in reply_text:
+        print("   DIAGNOSIS: the JSON is in there, with something wrapped round it.")
+        print("   A preamble like 'Here you go:', or ```json fences, or a cheery")
+        print("   sign-off at the end. The model was HELPFUL, and the")
+        print("   helpfulness broke our program.")
+        print("   FIX: there isn't a good one. You can write string-trimming code")
+        print("   and play whack-a-mole forever. Step 2 does something better.")
+
+    else:
+        print("   DIAGNOSIS: no JSON at all. The model answered in prose,")
+        print("   or refused, or misunderstood the instruction entirely.")
+
+else:
+    print("SUCCESS - we now have real data:")
+    print()
+    print("   customer_name :", parsed["customer_name"])
+    print("   company       :", parsed["company"])
+    print("   severity      :", parsed["severity"])
+    print()
+    print("   It worked. Now ask the harder question: what MADE it work?")
+    print("   Nothing did. We asked nicely and the model happened to oblige.")
+    print("   Nothing in this program would have stopped it adding a preamble,")
+    print("   or inventing a fourth key, or answering 'Urgent' instead of 'high'.")
+
+pause("Run this file four or five times. Do you get the same thing every time?")
 
 
 # =============================================================================
 #  WHAT TO TAKE AWAY
 # =============================================================================
 #
-#  We asked politely for JSON and we probably got JSON.
+#  We asked politely for JSON. On a big model, we probably got JSON.
 #
-#  But nothing FORCED it. The model could have added "Here you go:" in front.
-#  It could have wrapped the answer in ```json fences. It could have invented
-#  a fourth key, or used "Urgent" when we said the only options were low,
-#  medium, high and critical.
+#  If it worked, resist the urge to be pleased. Ask what MADE it work. Nothing
+#  did. Nothing in this program could have stopped the model adding "Here you
+#  go:" in front, or wrapping the answer in ```json fences, or inventing a
+#  fourth key, or answering "Urgent" when the only options we gave it were
+#  low, medium, high and critical.
 #
-#  And the failures are different every run - which is far worse than a bug
-#  that happens every time, because it will pass all your testing and then
-#  fail in production at 3am.
+#  It complied because it felt like it. That is not a guarantee, it is a
+#  probability - and a probability will pass all your testing and then fail in
+#  production at 3am, differently each time.
 #
-#  Step 2 shows what to do about it.
+#  There is also a second failure we met in section 6: the model thinking at
+#  such length that it never reaches the answer. We switched that off in
+#  section 3, but notice what that means. We had to know about a quirk of this
+#  particular family of models to get a reliable answer out of it at all.
+#
+#  Step 2 removes both problems at once, and does not rely on the model
+#  feeling cooperative.
 #
 # =============================================================================
 
