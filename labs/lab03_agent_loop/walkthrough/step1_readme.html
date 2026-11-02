@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — step1_by_hand.py</title>
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #e5e7eb;
+        background: radial-gradient(circle at top center, #111827, #020617);
+        min-height: 100vh;
+    }
+
+    body {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 20px 40px;
+    }
+
+    header {
+        margin-bottom: 18px;
+    }
+
+    header h1 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #e5e7eb;
+        letter-spacing: -0.02em;
+    }
+
+    header p {
+        margin-top: 4px;
+        font-size: 0.86rem;
+        color: #9ca3af;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid rgba(55, 65, 81, 0.7);
+        background: rgba(2, 6, 23, 0.95);
+    }
+
+    /* scrollbar */
+    .table-wrap::-webkit-scrollbar { height: 6px; width: 6px; }
+    .table-wrap::-webkit-scrollbar-track { background: rgba(15,23,42,0.8); border-radius: 999px; }
+    .table-wrap::-webkit-scrollbar-thumb { background: #1f2933; border-radius: 999px; }
+
+    table {
+        width: 100%;
+        min-width: 960px;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+        line-height: 1.55;
+    }
+
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #020817;
+        color: #38bdf8;
+        text-align: left;
+        padding: 10px 14px 9px;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    tbody tr {
+        transition: background 0.15s ease;
+    }
+
+    /* alternating rows */
+    tbody tr:nth-child(odd) {
+        background: rgba(15,23,42,0.18);
+    }
+    tbody tr:nth-child(even) {
+        background: rgba(15,23,42,0.36);
+    }
+
+    tbody tr:hover {
+        background: rgba(56, 189, 248, 0.07);
+    }
+
+    td {
+        padding: 8px 14px;
+        vertical-align: top;
+        border-bottom: 1px solid rgba(30, 41, 59, 0.65);
+    }
+
+    /* code cell */
+    td.code {
+        width: 46%;
+        font-family: SF Mono, Menlo, Consolas, "Liberation Mono", monospace;
+        background: #020817;
+        border-radius: 5px;
+        padding: 7px 9px;
+        white-space: pre-wrap;
+        word-break: break;
+        color: #e5e7eb;
+        font-size: 0.79rem;
+        line-height: 1.48;
+    }
+
+    /* explanation cell */
+    td.expl {
+        width: 54%;
+        color: #9ca3af;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding-left: 16px;
+    }
+
+    td.expl strong {
+        color: #e5e7eb;
+        font-weight: 600;
+    }
+
+    td.expl code {
+        background: rgba(30,41,59,0.8);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 0.79rem;
+        color: #e5e7eb;
+    }
+
+    td.expl ul {
+        margin: 2px 0 0 16px;
+        padding: 0;
+        color: #9ca3af;
+    }
+    td.expl li { margin: 1px 0; font-size: 0.84rem; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Code Walkthrough — step1_by_hand.py</h1>
+  <p>A single-turn, “by hand” walkthrough showing how an LLM agent uses tools via one API call.</p>
+</header>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th>Code</th>
+  <th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- Row: shebang + header comments -->
+<tr>
+<td class="code">#!/usr/bin/env python3
+# =============================================================================
+#  STEP 1 of 4  —  ONE TURN, BY HAND
+# =============================================================================
+...
+#  Run setup_sandbox.py first.
+# =============================================================================</td>
+<td class="expl">
+<strong>Purpose and context.</strong>
+<ul>
+<li>This is <strong>Step 1 of a 4-part educational sequence</strong> showing how an LLM agent interacts with tools, one turn at a time.</li>
+<li>The goal: demonstrate that what looks like “four human instructions” becomes fewer model actions via tool calls.</li>
+<li>You are expected to <strong>step through this in a debugger</strong> (F6 = Step Over). The comments guide you not to dive into library internals.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: imports -->
+<tr>
+<td class="code">import json
+import requests
+
+import pi_tools          # our three tool functions. Read that file, then F6 past it.</td>
+<td class="expl">
+<strong>Imports.</strong>
+<ul>
+<li><code>json</code>: serialize/deserialize JSON for API communication and parsing model arguments.</li>
+<li><code>requests</code>: HTTP client to call the LLM endpoint (OpenAI-compatible chat completions style).</li>
+<li><code>pi_tools</code>: local module that defines:
+  <ul>
+    <li>The tool schemas sent in the request.</li>
+    <li>A dispatch map from function names → real Python functions actually running on “the Pi.”</li>
+  </ul>
+</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: pause / SERVER config -->
+<tr>
+<td class="code"># --- scaffolding, not part of the lesson ----
+
+PAUSE = True
+SERVER = "http://localhost:8080"
+
+
+def pause(note):
+    print()
+    print("    " + "-" * 66)
+    if PAUSE:
+        input("    >>> " + note + "   (press Enter to continue) ")
+    else:
+        print("    >>> " + note)
+    print("    " + "-" * 66)
+    print()</td>
+<td class="expl">
+<strong>Interactive scaffolding.</strong>
+<ul>
+<li><code>PAUSE = True</code>: when enabled, each section waits for you to press Enter—so you can inspect output before moving on.</li>
+<li><code>SERVER</code>: base URL of a local LLM gateway (likely something like llama-cpp or similar) exposing an OpenAI-style <code>/v1/chat/completions</code> endpoint.</li>
+<li><code>pause(note)</code>: helper that prints a visual separator and prompts you; used to chunk the “lesson” into readable beats.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 1 - task -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 1  —  What the user asked for
+# =============================================================================
+
+task = ("Log on to the Pi, go to my home directory, find all the .tmp files "
+        "and delete the largest one if there is one.")
+
+print("THE TASK")
+print()
+print("   " + task)
+
+pause("Four instructions, the way a person would say them. Hold that thought.")</td>
+<td class="expl">
+<strong>Define the user’s request in natural language.</strong>
+<ul>
+<li>This is intentionally human-like and slightly ambiguous—exactly how users talk to agents.</li>
+<li>The print + pause highlights: “This is what a person would say.” You’ll later see why only <em>parts</em> of this are meaningful as tool actions.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 2 - model can't actually do -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 2  —  Two things the model will never do
+# =============================================================================
+
+print("WHAT THE MODEL CAN ACTUALLY DO")
+...
+print("     list_files(directory, pattern)   -> names and sizes")
+print("     delete_file(path)                -> deletes ONE file")
+...
+pause("Open pi_tools.py and look at the two schemas near the bottom.")</td>
+<td class="expl">
+<strong>Clarify what “logging in” and “cd ~” mean for an agent.</strong>
+<ul>
+<li>The user prompt says “Log on to the Pi” and “go to my home directory,” but:</li>
+<li>These are <em>not</em> model actions—the connection, auth, and base path are handled by our code (via environment or config in <code>pi_tools.py</code>).</li>
+<li>The model only sees two abstract tools:
+  <ul>
+    <li><code>list_files(directory, pattern)</code></li>
+    <li><code>delete_file(path)</code></li>
+  </ul>
+</li>
+<li>This illustrates a key point: agent prompts often include “flavor” instructions that map to environment setup, not model behavior.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 3 - build messages -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 3  —  Build the message list
+# =============================================================================
+
+system_prompt = ("You are a careful assistant with access to a Raspberry Pi. "
+                 "Use the tools rather than guessing. When the task is done, "
+                 "say so in one sentence and stop calling tools.")
+
+system_message = {}
+system_message["role"] = "system"
+system_message["content"] = system_prompt
+
+user_message = {}
+user_message["role"] = "user"
+user_message["content"] = task
+
+messages = []
+messages.append(system_message)
+messages.append(user_message)
+
+print("THE MESSAGE LIST  (" + str(len(messages)) + " items)")
+...
+pause("Two items. Remember that number.")</td>
+<td class="expl">
+<strong>Initialize the conversation history.</strong>
+<ul>
+<li><code>system_prompt</code>: sets behavior: use tools, avoid guessing, announce completion once done and stop.</li>
+<li>We build two messages:
+  <ul>
+    <li><code>{"role": "system", ...}</code></li>
+    <li><code>{"role": "user", "content": task}</code></li>
+  </ul>
+</li>
+<li>This matches the standard OpenAI-style chat format.</li>
+<li>The pause reminds you: right now, history = exactly two messages. In a full agent loop this list grows with each turn.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 4 - build request -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 4  —  Build the request
+# =============================================================================
+
+tools = []
+tools.append(pi_tools.LIST_FILES_SCHEMA)
+tools.append(pi_tools.DELETE_FILE_SCHEMA)
+
+request_body = {}
+request_body["model"] = "local-model"
+request_body["messages"] = messages
+request_body["tools"] = tools
+request_body["temperature"] = 0.0
+request_body["max_tokens"] = 800
+
+# Thinking mode off - see lab 2's walkthrough for why this matters.
+request_body["chat_template_kwargs"] = {"enable_thinking": False}
+request_body["reasoning_budget"] = 0</td>
+<td class="expl">
+<strong>Assemble the API payload.</strong>
+<ul>
+<li><code>tools</code>: list of tool schemas (JSON Schema-like descriptions) telling the model:
+  <ul>
+    <li>What tools exist.</li>
+    <li>What arguments each expects.</li>
+  </ul>
+</li>
+<li><code>"model": "local-model"</code>: identifier used by your local server (often ignored but required).</li>
+<li><code>temperature = 0.0</code>: deterministic behavior—important when testing tool calling; we want predictable choices.</li>
+<li>The “thinking” flags disable internal chain-of-thought style reasoning to keep output clean and focused on tool calls.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: print what we are sending -->
+<tr>
+<td class="code">print("WHAT WE ARE SENDING")
+...
+print("   The tool schemas are", len(json.dumps(tools)), "characters.")
+print("   They go over the wire on EVERY call. Remember that too.")
+
+pause("Now send it. F6, not F5.")</td>
+<td class="expl">
+<strong>Emphasize cost and overhead.</strong>
+<ul>
+<li>This reminds you:
+  <ul>
+    <li>We are shipping the full tool schemas on every single request (latency + token cost).</li>
+    <li>In real agent systems, that’s a non-trivial consideration for many tools or frequent calls.</li>
+  </ul>
+</li>
+<li>The “F6, not F5” note is debugger-specific: Step Over the HTTP call so you don’t fall into library internals.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 5 - send request -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 5  —  Send it
+# =============================================================================
+
+url = SERVER + "/v1/chat/completions"
+
+print("Sending to " + url + " ...")
+
+response = requests.post(url, json=request_body, timeout=180)
+
+print("HTTP status:", response.status_code)
+
+if response.status_code == 400:
+    print()
+    print("A 400 here almost always means llama-server was started without")
+    print("--jinja, so it has no tool-calling template. Add it and restart.")
+    raise SystemExit(1)</td>
+<td class="expl">
+<strong>Make the first (and only) API call in this file.</strong>
+<ul>
+<li>Sends JSON payload to a local OpenAI-style completions endpoint.</li>
+<li><code>timeout=180</code>: up to 3 minutes allowed; LLM inference can be slow, especially locally.</li>
+<li>The <code>400</code> guard is practical: if the server was launched without proper templating (<code>--jinja</code>) it won’t support tool-calling prompts and returns a 400. The script fails fast with guidance instead of confusing output.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 6 - parse response -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 6  —  What came back
+# =============================================================================
+
+response_json = response.json()
+
+choices_list = response_json["choices"]
+first_choice = choices_list[0]
+message_object = first_choice["message"]
+finish_reason = first_choice["finish_reason"]
+
+print("finish_reason :", repr(finish_reason))
+...
+if finish_reason == "tool_calls":
+    print("   -> the model wants a tool run. The conversation is NOT over.")
+else:
+    print("   -> the model thinks it is done. (Unexpected this early.)")</td>
+<td class="expl">
+<strong>Interpret what the model decided to do.</strong>
+<ul>
+<li>We unpack <code>response.json()["choices"][0]</code>, focusing on:</li>
+<li><code>finish_reason</code>:
+  <ul>
+    <li><code>"tool_calls"</code>: model believes a tool should run → conversation continues.</li>
+    <li><code>"stop"</code>: model thinks it’s done; in this script that would be unexpected on turn one.</li>
+  </ul>
+</li>
+<li>This is exactly the branching logic an agent loop would use: “tool_calls” means keep going; “stop” means end conversation.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: inspect tool_call content -->
+<tr>
+<td class="code">print()
+print("Anything in 'content'?", repr(message_object.get("content")))
+print()
+print("THE TOOL CALL")
+...
+print(json.dumps(message_object["tool_calls"], indent=2))
+
+pause("It asked for list_files. Look at the pattern it chose.")</td>
+<td class="expl">
+<strong>Show the model’s tool call.</strong>
+<ul>
+<li><code>content</code>: often empty when the model only emits a tool call (no chatty explanation).</li>
+<li>We print <code>tool_calls</code>, which includes:
+  <ul>
+    <li>Which tool to use.</li>
+    <li>The arguments it wants to pass (as JSON string).</li>
+  </ul>
+</li>
+<li>In this case, the model calls <code>list_files</code> with a pattern like “*.tmp” in the home directory—exactly what we’d expect.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: SECTION 7 - run tool -->
+<tr>
+<td class="code"># =============================================================================
+#  SECTION 7  —  Run the tool   *** our decision, not the model's ***
+# =============================================================================
+
+tool_calls = message_object["tool_calls"]
+first_call = tool_calls[0]
+
+call_id = first_call["id"]                       # we must quote this back
+called_function = first_call["function"]
+function_name = called_function["name"]
+arguments_text = called_function["arguments"]    # a STRING, not a dict
+arguments = json.loads(arguments_text)
+
+print("   name      :", function_name)
+print("   arguments :", arguments)
+...
+tool_function = pi_tools.DISPATCH.get(function_name)</td>
+<td class="expl">
+<strong>Extract and validate the requested tool call.</strong>
+<ul>
+<li>We read:
+  <ul>
+    <li><code>call_id</code>: needed to correlate results back in a real loop (not used here yet).</li>
+    <li><code>function_name</code> and JSON-decoded <code>arguments</code>.</li>
+  </ul>
+</li>
+<li>The <code>DISPATCH</code> dict in <code>pi_tools</code> maps allowed names (e.g., <code>"list_files"</code>) → real Python callables. This is a safety boundary: the model cannot invent new tools.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: execute tool -->
+<tr>
+<td class="code">if tool_function is None:
+    tool_output = "ERROR: no such tool: " + function_name
+else:
+    tool_output = tool_function(**arguments)
+
+print("WHAT THE TOOL RETURNED")
+...
+for line in tool_output.splitlines():
+    print("   " + line)
+
+pause("The model has not seen any of that yet. It is just sitting in a variable.")</td>
+<td class="expl">
+<strong>Run the real operation.</strong>
+<ul>
+<li>If unknown: return an error string instead of crashing—this would be fed back into the LLM as “tool output” in a full loop.</li>
+<li>Otherwise, call <code>tool_function(**arguments)</code>: e.g., it lists files matching *.tmp with sizes.</li>
+<li>Critical point (highlighted by pause): this result currently lives only in our code; the model does not know what we found until we send another request that includes it. That’s why a second file (step2) is needed to continue.</li>
+</ul>
+</td>
+</tr>
+
+<!-- Row: TAKEAWAY + ending -->
+<tr>
+<td class="code"># =============================================================================
+#  WHAT TO TAKE AWAY
+# =============================================================================
+
+...
+
+print()
+print("Finished one turn. We now hold a result the model has never seen.")
+print()
+print("Next:  python step2_by_hand.py")</td>
+<td class="expl">
+<strong>Core lesson.</strong>
+<ul>
+<li>This script proves three ideas by hand, in one clean pass:</li>
+<li>1) The natural-language prompt is decomposed into tool calls (not literal shell steps).</li>
+<li>2) Tool calling is asynchronous and stateless: model outputs a call → we run it → result must be fed back.</li>
+<li>3) A real agent loop is just repeated versions of this: append results to <code>messages</code>, call again, until <code>finish_reason == "stop"</code>.</li>
+<li>The final print nudges you toward Step 2 where the conversation continues with the new information.</li>
+</ul>
+</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+</html>
