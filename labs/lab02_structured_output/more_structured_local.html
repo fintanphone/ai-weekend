@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Code Walkthrough — structured_local.py</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --surface: #0b1020;
+      --border: rgba(75, 85, 99, 0.45);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --code-bg: #020817;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: radial-gradient(circle at top, #111827, #020617);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: 1.55rem;
+      color: #e5e7eb;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.94rem;
+      margin-top: 4px;
+    }
+
+    /* Table wrapper for horizontal scroll on smaller screens */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #0b1020, #020617);
+      padding-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 950px;
+      border-collapse: collapse;
+      font-size: 0.89rem;
+      color: var(--text);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #020617;
+      padding: 13px 14px 10px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+
+    tbody tr {
+      transition: background-color 0.2s ease, transform 0.16s ease;
+    }
+
+    tbody td {
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(75, 85, 99, 0.25);
+      vertical-align: top;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: rgba(15, 23, 42, 0.6);
+    }
+
+    tbody tr:hover {
+      background-color: rgba(29, 78, 216, 0.15);
+    }
+
+    /* Code column */
+    td.code-cell {
+      width: 46%;
+      min-width: 300px;
+    }
+
+    .code {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background-color: var(--code-bg);
+      padding: 6px 8px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e5e7eb;
+    }
+
+    /* Explanation column */
+    td.explain-cell {
+      width: 54%;
+      font-size: 0.89rem;
+      color: var(--muted);
+    }
+
+    /* Scrollbar styling */
+    .table-wrap::-webkit-scrollbar {
+      height: 6px;
+    }
+    .table-wrap::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Code Walkthrough — structured_local.py</h1>
+      <p class="subtitle">Line-by-line explanation of how the script evaluates three structured-output methods (prompt, JSON schema, tool calling).</p>
+    </header>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Row 1 -->
+          <tr>
+            <td class="code-cell"><span class="code">#!/usr/bin/env python3</span></td>
+            <td class="explain-cell">Standard shebang: tells Unix/macOS which interpreter to use when running the script directly.</td>
+          </tr>
+
+          <!-- Row 2 -->
+          <tr>
+            <td class="code-cell"><span class="code">"""Lab 2b — the same task, on your own GPU.
+Three ways to get structured data out of a local model: ... """</span></td>
+            <td class="explain-cell">Docstring explaining the lab’s purpose and three methods (A, B, C) for structured output; also shows example CLI commands. Purely documentation.</td>
+          </tr>
+
+          <!-- Row 3 -->
+          <tr>
+            <td class="code-cell"><span class="code">import argparse</span></td>
+            <td class="explain-cell">Import library to define command-line arguments (--trials, --tier, etc.).</td>
+          </tr>
+
+          <!-- Row 4 -->
+          <tr>
+            <td class="code-cell"><span class="code">import json</span></td>
+            <td class="explain-cell">Built-in JSON utilities for reading/writing and parsing.</td>
+          </tr>
+
+          <!-- Row 5 -->
+          <tr>
+            <td class="code-cell"><span class="code">import sys</span></td>
+            <td class="explain-cell">System-specific parameters; used here to modify Python’s module search path.</td>
+          </tr>
+
+          <!-- Row 6 -->
+          <tr>
+            <td class="code-cell"><span class="code">from datetime import datetime</span></td>
+            <td class="explain-cell">For recording timestamps when saving results.</td>
+          </tr>
+
+          <!-- Row 7 -->
+          <tr>
+            <td class="code-cell"><span class="code">from pathlib import Path</span></td>
+            <td class="explain-cell">Clean, cross-platform file path handling (e.g., locating results.json).</td>
+          </tr>
+
+          <!-- Row 8 -->
+          <tr>
+            <td class="code-cell"><span class="code">from dotenv import load_dotenv</span></td>
+            <td class="explain-cell">Loads environment variables from a .env file (often for keys/configs).</td>
+          </tr>
+
+          <!-- Row 9 -->
+          <tr>
+            <td class="code-cell"><span class="code">sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))</span></td>
+            <td class="explain-cell">Adds the project’s “common” directory to Python path so shared utilities can be imported.</td>
+          </tr>
+
+          <!-- Row 10 -->
+          <tr>
+            <td class="code-cell"><span class="code">from local_backend import NotSupported, connect, normalise_tool_args  # noqa: E402</span></td>
+            <td class="explain-cell">Imports backend helpers (defined elsewhere): connection logic, error for unsupported features, and tool-call normalization.</td>
+          </tr>
+
+          <!-- Row 11 -->
+          <tr>
+            <td class="code-cell"><span class="code">import tickets as T  # noqa: E402</span></td>
+            <td class="explain-cell">Imports ticket test cases and schemas from another local module (tickets.py).</td>
+          </tr>
+
+          <!-- Row 12 -->
+          <tr>
+            <td class="code-cell"><span class="code">load_dotenv()</span></td>
+            <td class="explain-cell">Actually loads the .env file into environment variables at runtime.</td>
+          </tr>
+
+          <!-- Row 13 -->
+          <tr>
+            <td class="code-cell"><span class="code">RESULTS = Path(__file__).parent / "results.json"</span></td>
+            <td class="explain-cell">Defines where run results will be stored (relative to this script).</td>
+          </tr>
+
+          <!-- Row 14 -->
+          <tr>
+            <td class="code-cell"><span class="code">TOOL = [{
+    "type": "function",
+    "function": {
+        "name": "record_ticket",
+        "description": "Record a parsed support ticket in the tracking system.",
+        "parameters": T.SCHEMA,
+    },
+}]</span></td>
+            <td class="explain-cell">Tool definition for method C (tool calling): describes a function whose parameters match the ticket schema.</td>
+          </tr>
+
+          <!-- Row 15 -->
+          <tr>
+            <td class="code-cell"><span class="code">def method_a(be, text: str):
+    out = be.chat([{"role": "user",
+                    "content": T.PROMPT_A.format(rules=T.RULES, ticket=text)}])
+    return be.json_from(out)</span></td>
+            <td class="explain-cell">Method A (Prompt + Parse): sends a natural-language prompt and parses JSON from the free-form reply. Fragile.</td>
+          </tr>
+
+          <!-- Row 16 -->
+          <tr>
+            <td class="code-cell"><span class="code">def method_b(be, text: str):
+    out = be.chat([{"role": "user",
+                    "content": f"{T.RULES}\n\nParse this support ticket:\n\n{text}"}],
+                  schema=T.SCHEMA)
+    return be.json_from(out)</span></td>
+            <td class="explain-cell">Method B (Constrained JSON via Schema): passes a JSON schema so the backend can constrain decoding. Forces structurally valid output.</td>
+          </tr>
+
+          <!-- Row 17 -->
+          <tr>
+            <td class="code-cell"><span class="code">def method_c(be, text: str):
+    out = be.chat([{"role": "user",
+                    "content": f"{T.RULES}\n\nParse this support ticket:\n\n{text}"}],
+                  tools=TOOL)
+    calls = out.get("tool_calls") or []
+    return normalise_tool_args(calls[0]) if calls else None</span></td>
+            <td class="explain-cell">Method C (Tool Calling): gives the model a callable tool. If used, we normalize and return its arguments.</td>
+          </tr>
+
+          <!-- Row 18 -->
+          <tr>
+            <td class="code-cell"><span class="code">METHODS = [("A  prompt", method_a), ("B  schema", method_b), ("C  tools ", method_c)]</span></td>
+            <td class="explain-cell">Lists all three methods with display names for reporting.</td>
+          </tr>
+
+          <!-- Row 19 -->
+          <tr>
+            <td class="code-cell"><span class="code">def run(trials: int, show: bool, misses: bool, label: str | None, tier: str) -> None:</span></td>
+            <td class="explain-cell">Main evaluation function signature.</td>
+          </tr>
+
+          <!-- Row 20 -->
+          <tr>
+            <td class="code-cell"><span class="code">    try:
+        be = connect()
+    except ConnectionError as exc:
+        print(f"\n\033[91m{exc}\033[0m\n")
+        return</span></td>
+            <td class="explain-cell">Try to connect to backend; if it fails, print error in red and exit early.</td>
+          </tr>
+
+          <!-- Row 21 -->
+          <tr>
+            <td class="code-cell"><span class="code">    cases = T.select(tier)</span></td>
+            <td class="explain-cell">Load test tickets based on tier argument (e.g., 1, 2, or all).</td>
+          </tr>
+
+          <!-- Row 22 -->
+          <tr>
+            <td class="code-cell"><span class="code">    style = be.probe_schema_support()</span></td>
+            <td class="explain-cell">Ask backend what kind of schema/constrained decoding support it offers.</td>
+          </tr>
+
+          <!-- Row 23 -->
+          <tr>
+            <td class="code-cell"><span class="code">    tag = label or be.model_name</span></td>
+            <td class="explain-cell">Use a user-provided run label if given; otherwise default to model name.</td>
+          </tr>
+
+          <!-- Row 24 -->
+          <tr>
+            <td class="code-cell"><span class="code">    print(f"\n  backend        {be.kind} at {be.base}")
+    print(f"  model          {be.model_name}")
+    print(f"  schema support {style or 'NONE — method B will be skipped'}")
+    print(f"  tickets        {len(cases)}  (tier {tier})   trials {trials}")
+    print(f"  label          {tag}\n")</span></td>
+            <td class="explain-cell">Print run metadata: backend, model, schema support status, ticket count, trials, and label.</td>
+          </tr>
+
+          <!-- Row 25 -->
+          <tr>
+            <td class="code-cell"><span class="code">    print("  valid  = parseable, all keys present, severity inside the enum")
+    print("  fields = of 4 checkable fields, how many were actually right\n")</span></td>
+            <td class="explain-cell">Explain evaluation metrics: “valid” (structural correctness) vs “fields right” (factual accuracy).</td>
+          </tr>
+
+          <!-- Row 26 -->
+          <tr>
+            <td class="code-cell"><span class="code">    header = f"  {'method':<12} {'valid':>12} {'fields right':>14}"
+    tiers = sorted({t["tier"] for t in cases})
+    for ti in tiers:
+        header += f" {'tier ' + str(ti):>9}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))</span></td>
+            <td class="explain-cell">Build a table header showing columns for validity, accuracy, and per-tier breakdowns.</td>
+          </tr>
+
+          <!-- Row 27 -->
+          <tr>
+            <td class="code-cell"><span class="code">    record = {"label": tag, "backend": be.kind, "model": be.model_name,
+              "schema_style": style, "trials": trials, "tier": tier,
+              "when": datetime.now().isoformat(timespec="seconds"), "methods": {}}</span></td>
+            <td class="explain-cell">Initialize a result dictionary for this run; will hold metrics and metadata to save.</td>
+          </tr>
+
+          <!-- Row 28 -->
+          <tr>
+            <td class="code-cell"><span class="code">    all_misses = []</span></td>
+            <td class="explain-cell">List to collect specific failure details for --misses output.</td>
+          </tr>
+
+          <!-- Row 29 -->
+          <tr>
+            <td class="code-cell"><span class="code">    for name, fn in METHODS:
+        valid = attempts = got = possible = 0
+        per_tier = {ti: [0, 0] for ti in tiers}
+        unsupported = None</span></td>
+            <td class="explain-cell">For each method, reset counters and per-tier stats. `unsupported` tracks if a feature isn’t available.</td>
+          </tr>
+
+          <!-- Row 30 -->
+          <tr>
+            <td class="code-cell"><span class="code">        for case in cases:
+            for _ in range(trials):
+                attempts += 1</span></td>
+            <td class="explain-cell">Outer loop over test tickets; inner loop runs each ticket multiple times (trials).</td>
+          </tr>
+
+          <!-- Row 31 -->
+          <tr>
+            <td class="code-cell"><span class="code">                try:
+                    result = fn(be, case["text"])
+                except NotSupported as exc:
+                    unsupported = str(exc)[:50]
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    all_misses.append((name, case["id"], type(exc).__name__))
+                    continue</span></td>
+            <td class="explain-cell">Call the method; if unsupported, record and break. For unexpected errors, log them for --misses.</td>
+          </tr>
+
+          <!-- Row 32 -->
+          <tr>
+            <td class="code-cell"><span class="code">                if T.is_valid(result):
+                    valid += 1
+                s, total, wrong = T.accuracy(result, case["expect"])
+                got += s
+                possible += total
+                per_tier[case["tier"]][0] += s
+                per_tier[case["tier"]][1] += total
+                for w in wrong:
+                    all_misses.append((name, case["id"], w))</span></td>
+            <td class="explain-cell">Check if output is valid. Compute field-level accuracy vs expected values. Track totals and log each incorrect field as a “miss.”</td>
+          </tr>
+
+          <!-- Row 33 -->
+          <tr>
+            <td class="code-cell"><span class="code">                if show:
+                    print(f"    \033[90m{case['id']}: {json.dumps(result)}\033[0m")
+            if unsupported:
+                break</span></td>
+            <td class="explain-cell">If --show, print every parsed JSON. If method is unsupported for this backend, stop that method.</td>
+          </tr>
+
+          <!-- Row 34 -->
+          <tr>
+            <td class="code-cell"><span class="code">        if unsupported:
+            print(f"  {name:<12} {'—':>12} {'—':>14}   unsupported: {unsupported}")
+            record["methods"][name.strip()] = None
+            continue</span></td>
+            <td class="explain-cell">If current method is not supported, print “—” and mark as skipped in the record.</td>
+          </tr>
+
+          <!-- Row 35 -->
+          <tr>
+            <td class="code-cell"><span class="code">        vpct = 100 * valid / attempts if attempts else 0
+        apct = 100 * got / possible if possible else 0
+        row = f"  {name:<12} {valid}/{attempts} ({vpct:>3.0f}%)".ljust(28)
+        row += f"{got}/{possible} ({apct:>3.0f}%)".rjust(14)</span></td>
+            <td class="explain-cell">Compute validity % and accuracy %, build the start of a results row for console output.</td>
+          </tr>
+
+          <!-- Row 36 -->
+          <tr>
+            <td class="code-cell"><span class="code">        tier_pcts = {}
+        for ti in tiers:
+            g, p = per_tier[ti]
+            pct = 100 * g / p if p else 0
+            tier_pcts[ti] = round(pct, 1)
+            row += f" {pct:>8.0f}%"</span></td>
+            <td class="explain-cell">Compute and append per-tier accuracy percentages to the output row; store them for saving.</td>
+          </tr>
+
+          <!-- Row 37 -->
+          <tr>
+            <td class="code-cell"><span class="code">        print(row)
+        record["methods"][name.strip()] = {"valid_pct": round(vpct, 1),
+                                           "accuracy_pct": round(apct, 1),
+                                           "by_tier": tier_pcts}</span></td>
+            <td class="explain-cell">Print the formatted results row and store metrics into the run’s record dict.</td>
+          </tr>
+
+          <!-- Row 38 -->
+          <tr>
+            <td class="code-cell"><span class="code">    save(record)</span></td>
+            <td class="explain-cell">After all methods are evaluated, write the record to results.json (append/update).</td>
+          </tr>
+
+          <!-- Row 39 -->
+          <tr>
+            <td class="code-cell"><span class="code">    if misses and all_misses:
+        print("\n  \033[93mwhat went wrong\033[0m")
+        seen = {}
+        for method, cid, what in all_misses:
+            seen.setdefault((method, cid), []).append(what)</span></td>
+            <td class="explain-cell">If --misses is enabled, group errors by (method, ticket ID) to show specific problems.</td>
+          </tr>
+
+          <!-- Row 40 -->
+          <tr>
+            <td class="code-cell"><span class="code">        def order(item):
+            (method, cid), _ = item
+            case = next(c for c in cases if c["id"] == cid)
+            return (-case["tier"], method, cid)</span></td>
+            <td class="explain-cell">Sort misses so tier 2 (harder traps) appear first.</td>
+          </tr>
+
+          <!-- Row 41 -->
+          <tr>
+            <td class="code-cell"><span class="code">        rows = sorted(seen.items(), key=order)
+        shown = rows[:12]
+        for (method, cid), whats in shown:
+            case = next(c for c in cases if c["id"] == cid)
+            common = max(set(whats), key=whats.count)
+            print(f"    {method}  {cid:<20} {common}")
+            if case["traps"] != "none":
+                print(f"      \033[90m{case['traps']}\033[0m")</span></td>
+            <td class="explain-cell">Print up to 12 most notable misses, with the dominant error reason and any trap notes.</td>
+          </tr>
+
+          <!-- Row 42 -->
+          <tr>
+            <td class="code-cell"><span class="code">        if len(rows) > len(shown):
+            print(f"    \033[90m... and {len(rows) - len(shown)} more "
+                  f"(use --tier 2 to focus)\033[0m")</span></td>
+            <td class="explain-cell">If there are more misses than shown, inform the user how to filter.</td>
+          </tr>
+
+          <!-- Row 43 -->
+          <tr>
+            <td class="code-cell"><span class="code">    print(f"\n  saved to {RESULTS.name}\n")
+    print("""\033[93mWhat to look for:\033[0m
+Tier 1 should be close to 100% everywhere...""")</span></td>
+            <td class="explain-cell">Print where results were saved and a short debrief about expected behavior (Tier 1 easy, Tier 2 traps; Method B keeps shape but not truth).</td>
+          </tr>
+
+          <!-- Row 44 -->
+          <tr>
+            <td class="code-cell"><span class="code">def save(record: dict) -> None:
+    history = []
+    if RESULTS.exists():
+        try:
+            history = json.loads(RESULTS.read_text())
+        except json.JSONDecodeError:
+            pass</span></td>
+            <td class="explain-cell">Load existing results.json into a list, or start empty. Gracefully handle corrupt/empty files.</td>
+          </tr>
+
+          <!-- Row 45 -->
+          <tr>
+            <td class="code-cell"><span class="code">    key = (record["label"], record["tier"])
+    history = [h for h in history if (h.get("label"), h.get("tier")) != key]
+    history.append(record)
+    RESULTS.write_text(json.dumps(history, indent=2))</span></td>
+            <td class="explain-cell">Remove any previous run with the same label+tier to avoid duplication, append new result, write back.</td>
+          </tr>
+
+          <!-- Row 46 -->
+          <tr>
+            <td class="code-cell"><span class="code">def compare() -> None:
+    if not RESULTS.exists():
+        print("\nNo saved runs yet.\n")
+        return
+    history = json.loads(RESULTS.read_text())
+    if not history:
+        print("\nNo saved runs yet.\n")
+        return</span></td>
+            <td class="explain-cell">compare(): load previous runs; exit politely if there’s nothing to show.</td>
+          </tr>
+
+          <!-- Row 47 -->
+          <tr>
+            <td class="code-cell"><span class="code">    print(f"\n  {'label':<24} {'tier':>5} {'A prompt':>16} {'B schema':>16} {'C tools':>16}")
+    print("  " + "-" * 80)</span></td>
+            <td class="explain-cell">Print table header for comparing saved runs.</td>
+          </tr>
+
+          <!-- Row 48 -->
+          <tr>
+            <td class="code-cell"><span class="code">    for h in history:
+        cells = []
+        for key in ("A  prompt", "B  schema", "C  tools"):
+            m = h["methods"].get(key)
+            cells.append("—" if not m
+                         else f"{m['valid_pct']:.0f}% / {m['accuracy_pct']:.0f}%")
+        print(f"  {h['label'][:24]:<24} {str(h.get('tier','?')):>5} "
+              + " ".join(f"{c:>16}" for c in cells))</span></td>
+            <td class="explain-cell">For each run, print label, tier, and for A/B/C: “valid%/accuracy%”.</td>
+          </tr>
+
+          <!-- Row 49 -->
+          <tr>
+            <td class="code-cell"><span class="code">    print("\n  each cell is  valid% / fields-right%")
+    print("  a model that holds 100% valid while accuracy drops is the whole lesson\n")</span></td>
+            <td class="explain-cell">Reinforce key lesson: constrained decoding guarantees shape (validity) but not correctness.</td>
+          </tr>
+
+          <!-- Row 50 -->
+          <tr>
+            <td class="code-cell"><span class="code">if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--trials", type=int, default=3)
+    ap.add_argument("--tier", default="all", choices=["1", "2", "all"])
+    ap.add_argument("--label", help="name this run, e.g. '27B IQ3_M'")
+    ap.add_argument("--show", action="store_true", help="print every parsed object")
+    ap.add_argument("--misses", action="store_true", help="show which traps caught it")
+    ap.add_argument("--compare", action="store_true")
+    args = ap.parse_args()</span></td>
+            <td class="explain-cell">CLI setup: define how users control trials, tier selection, labeling, verbosity, and comparison via flags.</td>
+          </tr>
+
+          <!-- Row 51 -->
+          <tr>
+            <td class="code-cell"><span class="code">    if args.compare:
+        compare()
+    else:
+        run(args.trials, args.show, args.misses, args.label, args.tier)</span></td>
+            <td class="explain-cell">Entry point logic: either run a fresh evaluation or show comparisons of saved runs based on flags.</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
+

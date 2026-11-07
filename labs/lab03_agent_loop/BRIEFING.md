@@ -88,10 +88,15 @@ answer. This is also the habit that makes Lab 7 and Lab 8 make sense.
 
 ## Running the room
 
-**Start in `walkthrough/`, on one screen, with a debugger open.** Four small
-programs that build the loop from a single exchange: one turn by hand, then the
-whole task longhand, then the same thing as a while-loop, then a human approval
-gate. Budget thirty-five minutes.
+**Start in `walkthrough/`, on one screen, with a debugger open.** Five small
+programs that build the loop from nothing: one tool called by hand with no model
+at all, then one turn, then the whole task longhand, then the same thing as a
+while-loop, then a human approval gate. Budget forty-five minutes.
+
+**Step 0 is five minutes and worth all of them.** People arrive assuming a
+"tool" is some special AI construct. It's a Python function. Step 0 calls one
+six times with no model, no network and no API key in the file — so when the
+model appears in step 1, the only new idea is *who chooses the arguments*.
 
 The task is a real one — SSH to a Raspberry Pi, find the largest `.tmp` file in
 the home directory, delete it — running against a fake Pi folder so nothing

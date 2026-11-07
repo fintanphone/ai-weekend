@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — step4_guardrails.py</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;
+    background:#020617;
+    background-image:radial-gradient(ellipse at top, #111827 0%, #020617 80%);
+    color:#e5e7eb;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,-system-font-sans-serif,sans-serif;
+  }
+  .container{
+    max-width:1200px;margin:0 auto;padding:24px;
+  }
+  header{margin-bottom:18px}
+  h1{
+    font-size:1.5rem;font-weight:600;color:#f9fafb;letter-spacing:.01em;
+    margin:0 0 4px 0;
+  }
+  .subtitle{
+    color:#9ca3af;font-size:.875rem;margin:0;
+  }
+
+  /* Scroll wrapper */
+  .table-wrapper{
+    width:100%;
+    overflow-x:auto;
+    border-radius:8px;
+    background:#020617f2;
+    box-shadow:0 14px 35px rgba(0,0,0,.45);
+    border:1px solid #111827cc;
+  }
+
+  /* Table */
+  table{
+    width:100%;border-collapse:collapse;font-size:.89rem;line-height:1.45;
+  }
+
+  thead th{
+    position:sticky;top:0;z-index:3;
+    background:#020617;color:#38bdf8;
+    font-weight:600;text-align:left;
+    padding:9px 10px;border-bottom:1.5px solid #1f2933;
+    white-space:nowrap;letter-spacing:.02em;
+    text-transform:uppercase;font-size:.74rem;
+  }
+
+  tbody td{
+    vertical-align:top;padding:6px 8px;
+    border-bottom:1px solid rgba(55,65,81,.35);
+  }
+
+  /* Alternating rows */
+  tbody tr:nth-child(even){background-color:rgba(15,23,42,.45)}
+
+  /* Hover effect */
+  tbody tr{transition:background .16s ease}
+  tbody tr:hover{background-color:rgba(56,189,248,.07)}
+
+  /* Code cell */
+  td.code-cell{
+    width:46%;min-width:340px;max-width:55%;
+    font-family:"SF Mono",Menlo,"Liberation Mono",Consolas,"Courier New",monospace;
+    font-size:.82rem;line-height:1.46;color:#e5e7eb;
+  }
+  td.code-cell pre{
+    margin:0;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;
+    background:#020817;border-radius:6px;padding:6px 7px;
+    border:1px solid #111827cc;font-size:.83rem;
+  }
+
+  /* Explanation cell */
+  td.expl-cell{
+    width:54%;padding-left:14px;color:#9ca3af;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,-system-font-sans-serif,sans-serif;
+  }
+
+  /* Scrollbar */
+  .table-wrapper::-webkit-scrollbar{height:6px}
+  .table-wrapper::-webkit-scrollbar-track{background:#020817;border-radius:4px}
+  .table-wrapper::-webkit-scrollbar-thumb{
+    background:#374151;border-radius:4px;
+  }
+
+  /* Utility */
+  a{color:#38bdf8;text-decoration:none}a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Code Walkthrough — step4_guardrails.py</h1>
+    <p class="subtitle">Human-approval gate for destructive agent actions, plus a comparison between narrow tools vs one “fat” shell tool.</p>
+  </header>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Explanation</th>
+        </tr>
+      </thead>
+      <tbody>
+
+<!-- Row: shebang + doc header -->
+<tr>
+  <td class="code-cell">
+    <pre>#!/usr/bin/env python3
+# STEP 4 of 4 — THE HUMAN GATE, AND A TEMPTING SHORTCUT</pre>
+  </td>
+  <td class="expl-cell">
+    Shebang makes this directly executable. The header comments frame this as the final step in a tutorial: adding safety controls and exploring a tempting shortcut (one big shell tool).
+  </td>
+</tr>
+
+<!-- Row: narrative comment block -->
+<tr>
+  <td class="code-cell">
+    <pre># Step 3's loop works. It also deleted a file without asking anybody.
+# This file adds two things:
+#   1. A human approval gate in front of anything destructive...
+#   2. A switch to run the same task with ONE powerful tool instead...</pre>
+  </td>
+  <td class="expl-cell">
+    Explains the goals clearly: (1) add a human-in-the-loop guard for dangerous operations; (2) provide an easy toggle so you can compare using two narrow tools vs one general shell-execution tool.
+  </td>
+</tr>
+
+<!-- Row: imports -->
+<tr>
+  <td class="code-cell">
+    <pre>import json
+import sys
+import requests
+import pi_tools</pre>
+  </td>
+  <td class="expl-cell">
+    - json: encode/decode tool arguments and payloads.
+    - sys.argv: detect the --fat-tool flag from command line.
+    - requests: call a local LLM endpoint (OpenAI-style API).
+    - pi_tools: custom module defining tool schemas, dispatch map, etc.
+  </td>
+</tr>
+
+<!-- Row: config flags -->
+<tr>
+  <td class="code-cell">
+    <pre>PAUSE = True
+SERVER = "http://localhost:8080"
+MAX_TURNS = 8
+
+USE_FAT_TOOL = "--fat-tool" in sys.argv</pre>
+  </td>
+  <td class="expl-cell">
+    - PAUSE: enables interactive prompts for readability during the demo.
+    - SERVER: where the local LLM is served (OpenAI-compatible route).
+    - MAX_TURNS: safety bound on loop iterations so it doesn’t run forever.
+    - USE_FAT_TOOL: true when script is invoked with --fat-tool; switches toolset later.
+  </td>
+</tr>
+
+<!-- Row: NEEDS_APPROVAL -->
+<tr>
+  <td class="code-cell">
+    <pre>NEEDS_APPROVAL = ["delete_file", "run_command"]</pre>
+  </td>
+  <td class="expl-cell">
+    Hard-coded allowlist of tool names that must be explicitly approved by a human before execution. This is controlled solely in this code; the model cannot override it.
+  </td>
+</tr>
+
+<!-- Row: pause function -->
+<tr>
+  <td class="code-cell">
+    <pre>def pause(note):
+    print()
+    print("    " + "-" * 66)
+    if PAUSE:
+        input("    >>> " + note + "   (press Enter to continue) ")
+    else:
+        print("    >>> " + note)
+    print("    " + "-" * 66)
+    print()</pre>
+  </td>
+  <td class="expl-cell">
+    Utility to slow down output during demos. If PAUSE is True, blocks waiting for Enter so the operator can read what happened before continuing; otherwise just prints a banner.
+  </td>
+</tr>
+
+<!-- Row: ask_the_human header + docstring -->
+<tr>
+  <td class="code-cell">
+    <pre># THE GATE
+
+def ask_the_human(name, arguments):
+    """Returns True to allow, False to refuse."""</pre>
+  </td>
+  <td class="expl-cell">
+    Introduces the “gate” function. It’s intentionally tiny: its whole job is to ask a person whether to proceed with a given tool call and return their answer as a boolean.
+  </td>
+</tr>
+
+<!-- Row: ask_the_human body -->
+<tr>
+  <td class="code-cell">
+    <pre>print()
+print("   " + "!" * 60)
+print("   THE AGENT WANTS TO RUN SOMETHING DESTRUCTIVE")
+print()
+print("      tool      : " + name)
+print("      arguments : " + json.dumps(arguments))
+print("   " + "!" * 60)
+answer = input("   Allow this? [y/N] ").strip().lower()
+return answer == "y"</pre>
+  </td>
+  <td class="expl-cell">
+    Visually highlights that a destructive action is pending, shows tool name and arguments, then prompts the operator. Defaults to NO: only explicit “y” counts as approval. This is a simple but effective human-override design.
+  </td>
+</tr>
+
+<!-- Row: task definition -->
+<tr>
+  <td class="code-cell">
+    <pre>task = ("Log on to the Pi, go to my home directory, find all the .tmp files "
+        "and delete the largest one if there is one.")</pre>
+  </td>
+  <td class="expl-cell">
+    The user instruction given to the agent. It’s deliberately ambiguous enough that how it chooses its tools and commands becomes instructive (e.g., glob patterns, accidental deletion risk).
+  </td>
+</tr>
+
+<!-- Row: system_prompt -->
+<tr>
+  <td class="code-cell">
+    <pre>system_prompt = ("You are a careful assistant with access to a Raspberry Pi. "
+                 "Use the tools rather than guessing. When the task is done, "
+                 "say so in one sentence and stop calling tools.")</pre>
+  </td>
+  <td class="expl-cell">
+    System message sets expectations: be cautious, rely on provided tool definitions (not improvisation), and stop once complete. Helps reduce hallucinated or out-of-scope calls.
+  </td>
+</tr>
+
+<!-- Row: initialize messages -->
+<tr>
+  <td class="code-cell">
+    <pre>messages = []
+messages.append({"role": "system", "content": system_prompt})
+messages.append({"role": "user", "content": task})</pre>
+  </td>
+  <td class="expl-cell">
+    Initializes the conversation history as seen by the model: one system message with instructions, one user message with the actual task. All subsequent assistant/tool messages are appended here to maintain context.
+  </td>
+</tr>
+
+<!-- Row: tools selection -->
+<tr>
+  <td class="code-cell">
+    <pre>tools = []
+if USE_FAT_TOOL:
+    tools.append(pi_tools.RUN_COMMAND_SCHEMA)
+else:
+    tools.append(pi_tools.LIST_FILES_SCHEMA)
+    tools.append(pi_tools.DELETE_FILE_SCHEMA)</pre>
+  </td>
+  <td class="expl-cell">
+    Core experiment control:
+    - Default (no flag): two narrow, well-defined tools—list files and delete a file. Easier to guard.
+    - With --fat-tool: one generic “run shell command” schema that can do anything; harder to statically reason about safety.
+  </td>
+</tr>
+
+<!-- Row: counters + initial prints -->
+<tr>
+  <td class="code-cell">
+    <pre>tokens_sent_total = 0
+tools_run_total = 0
+refusals = 0
+
+print("TASK")
+print("   " + task)
+print()
+print("TOOLS AVAILABLE TO THE MODEL")
+for t in tools:
+    print("   " + t["function"]["name"])</pre>
+  </td>
+  <td class="expl-cell">
+    - Initializes metrics to track cost/effort: tokens sent, tool invocations, and refusals.
+    - Prints the task and available tools so the human can see exactly what the model knows it may use.
+  </td>
+</tr>
+
+<!-- Row: mode notice + pause -->
+<tr>
+  <td class="code-cell">
+    <pre>if USE_FAT_TOOL:
+    print("   \033[93mYou are running with ONE shell tool...")
+else:
+    print("   Two narrow tools. Each one does exactly one thing.")
+
+pause("Same loop as step 3, with a gate added at step 4 of the five.")</pre>
+  </td>
+  <td class="expl-cell">
+    Calls attention to which mode is active before proceeding: single shell tool (risky) vs narrow tools. The pause ensures you’re ready for the loop output.
+  </td>
+</tr>
+
+<!-- Row: main loop header -->
+<tr>
+  <td class="code-cell">
+    <pre>final_answer = "(the loop ended without an answer)"
+
+for turn in range(1, MAX_TURNS + 1):
+    print("=" * 72)
+    print("TURN", turn)</pre>
+  </td>
+  <td class="expl-cell">
+    Begins the main agent loop: up to MAX_TURNS rounds. final_answer is a fallback; it will be overwritten if the model gives a proper answer before stopping. Each iteration prints a “turn” header for readability.
+  </td>
+</tr>
+
+<!-- Row: request body -->
+<tr>
+  <td class="code-cell">
+    <pre>body = {
+        "model": "local-model",
+        "messages": messages,
+        "tools": tools,
+        "temperature": 0.0,
+        "max_tokens": 800,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_budget": 0,
+    }</pre>
+  </td>
+  <td class="expl-cell">
+    Constructs the API request:
+    - Uses entire conversation history plus available tools.
+    - temperature=0.0 for deterministic behavior.
+    - Disables internal “thinking”/reasoning steps to keep interaction straightforward and auditable.
+  </td>
+</tr>
+
+<!-- Row: HTTP call + basic parsing -->
+<tr>
+  <td class="code-cell">
+    <pre>http_reply = requests.post(SERVER + "/v1/chat/completions", json=body, timeout=180)
+http_reply.raise_for_status()
+data = http_reply.json()</pre>
+  </td>
+  <td class="expl-cell">
+    Sends the request to a local LLM endpoint (OpenAI-style route). raise_for_status() ensures HTTP errors crash loudly instead of being silently ignored. Response is parsed as JSON for further handling.
+  </td>
+</tr>
+
+<!-- Row: token tracking + choice -->
+<tr>
+  <td class="code-cell">
+    <pre>tokens_sent_total = tokens_sent_total + data.get("usage", {}).get("prompt_tokens", 0)
+
+choice = data["choices"][0]
+reply = choice["message"]
+finish_reason = choice["finish_reason"]</pre>
+  </td>
+  <td class="expl-cell">
+    - Accumulates prompt tokens to estimate context load across turns.
+    - Extracts the model’s first (and only) completion, its message content, and why it stopped: either “stop”/“tool_calls”, etc.
+  </td>
+</tr>
+
+<!-- Row: print assistant text or end loop -->
+<tr>
+  <td class="code-cell">
+    <pre>if reply.get("content"):
+    print("   " + reply["content"].strip())
+
+if finish_reason != "tool_calls":
+    final_answer = reply.get("content") or "(no answer given)"
+    print()
+    print("   no tool wanted - the loop ends.")
+    break</pre>
+  </td>
+  <td class="expl-cell">
+    If the model outputs plain text, it’s printed. If it did not request tools (finish_reason != "tool_calls"), we treat its message as the final answer and exit: no further tool calls are needed.
+  </td>
+</tr>
+
+<!-- Row: append assistant reply to history -->
+<tr>
+  <td class="code-cell">
+    <pre>messages.append(reply)</pre>
+  </td>
+  <td class="expl-cell">
+    Adds the assistant’s response (including any tool_calls) back into the conversation so the model sees its own actions and their eventual results in subsequent turns.
+  </td>
+</tr>
+
+<!-- Row: iterate over each tool_call -->
+<tr>
+  <td class="code-cell">
+    <pre>for tool_call in reply["tool_calls"]:
+        name = tool_call["function"]["name"]
+        arguments = json.loads(tool_call["function"]["arguments"])
+
+        print("   -> " + name + "(" + json.dumps(arguments) + ")")</pre>
+  </td>
+  <td class="expl-cell">
+    For each requested tool use, extract:
+    - name (e.g. “delete_file”)
+    - arguments (parsed as a dict).
+    Prints the call so humans can audit what the agent intends to run before executing it.
+  </td>
+</tr>
+
+<!-- Row: approval gate logic -->
+<tr>
+  <td class="code-cell">
+    <pre>if name in NEEDS_APPROVAL:
+        allowed = ask_the_human(name, arguments)
+else:
+        allowed = True</pre>
+  </td>
+  <td class="expl-cell">
+    The guardrail in action: if the requested tool is on the “needs approval” list (e.g., delete_file, run_command), prompt the human; otherwise proceed. This keeps fast for benign tools and cautious for risky ones.
+  </td>
+</tr>
+
+<!-- Row: refusal path -->
+<tr>
+  <td class="code-cell">
+    <pre>if not allowed:
+        output = ("REFUSED by the human operator. The file was NOT deleted. "
+                  "Do not try again; report that you could not complete "
+                  "the task.")
+        refusals = refusals + 1
+        print("   <- " + output)</pre>
+  </td>
+  <td class="expl-cell">
+    If the human declines:
+    - We synthesize a tool response saying “REFUSED” and instructing the model not to retry.
+    - This is fed back as if it were normal tool output, so the model can adapt instead of crashing or silently ignoring the refusal.
+  </td>
+</tr>
+
+<!-- Row: allowed path + dispatch -->
+<tr>
+  <td class="code-cell">
+    <pre>else:
+        function = pi_tools.DISPATCH.get(name)
+        if function is None:
+            output = "ERROR: no such tool: " + name
+        else:
+            output = function(**arguments)
+        tools_run_total = tools_run_total + 1</pre>
+  </td>
+  <td class="expl-cell">
+    If allowed:
+    - Look up the actual Python callable for this tool from pi_tools.DISPATCH.
+    - Call it with parsed arguments (e.g., delete_file(path=...)).
+    - Increment tools_run_total to track how many real operations were performed.
+  </td>
+</tr>
+
+<!-- Row: print truncated output -->
+<tr>
+  <td class="code-cell">
+    <pre>for line in output.splitlines()[:6]:
+        print("   <- " + line)</pre>
+  </td>
+  <td class="expl-cell">
+    Prints up to the first six lines of tool output so the operator can see what happened without flooding the console. Longer outputs are still sent into conversation context, even if not fully shown here.
+  </td>
+</tr>
+
+<!-- Row: append tool result as message -->
+<tr>
+  <td class="code-cell">
+    <pre>messages.append({
+        "role": "tool",
+        "tool_call_id": tool_call["id"],
+        "content": output,
+    })</pre>
+  </td>
+  <td class="expl-cell">
+    Adds the tool’s result back into the conversation as a “tool” role message bound to that specific tool_call_id. This is how the model knows which response corresponds to which call and can continue reasoning from it.
+  </td>
+</tr>
+
+<!-- Row: turn summary -->
+<tr>
+  <td class="code-cell">
+    <pre>print()
+print("   messages:", len(messages), "items     tokens sent:", tokens_sent_total)</pre>
+  </td>
+  <td class="expl-cell">
+    Shows how large the conversation context has grown (messages count) and cumulative prompt tokens consumed—useful to compare efficiency between tool configurations.
+  </td>
+</tr>
+
+<!-- Row: else on for-loop: max turns reached -->
+<tr>
+  <td class="code-cell">
+    <pre>else:
+    print()
+    print("   Hit the turn limit of", MAX_TURNS, "without finishing.")</pre>
+  </td>
+  <td class="expl-cell">
+    Python’s for/else: this runs only if the loop finishes without break—meaning we exhausted MAX_TURNS. This is a safety stop so runaway behavior (e.g., confused agent) doesn’t continue unbounded.
+  </td>
+</tr>
+
+<!-- Row: final tally header -->
+<tr>
+  <td class="code-cell">
+    <pre>print("=" * 72)
+print("ANSWER")
+print("=" * 72)</pre>
+  </td>
+  <td class="expl-cell">
+    Marks the end section where we summarize results for easy comparison between runs.
+  </td>
+</tr>
+
+<!-- Row: print final answer -->
+<tr>
+  <td class="code-cell">
+    <pre>for line in final_answer.strip().splitlines():
+        print("   " + line)</pre>
+  </td>
+  <td class="expl-cell">
+    Prints the model’s final textual answer (or fallback) cleanly, preserving line structure.
+  </td>
+</tr>
+
+<!-- Row: metrics summary -->
+<tr>
+  <td class="code-cell">
+    <pre>print("   mode          :", "ONE SHELL TOOL" if USE_FAT_TOOL else "two narrow tools")
+print("   turns taken   :", turn)
+print("   tools run     :", tools_run_total)
+print("   refused       :", refusals)
+print("   tokens sent   :", tokens_sent_total)</pre>
+  </td>
+  <td class="expl-cell">
+    Summarizes:
+    - Which tool strategy was used.
+    - How many turns, actual tool executions, human refusals, and total prompt tokens.
+    This makes it easy to compare safety vs efficiency between configurations.
+  </td>
+</tr>
+
+<!-- Row: final pause -->
+<tr>
+  <td class="code-cell">
+    <pre>pause("Now run it the other way and compare these numbers.")</pre>
+  </td>
+  <td class="expl-cell">
+    Prompts you (if PAUSE is on) to think about what just happened before running the alternate mode with --fat-tool. Encourages direct, side-by-side experimentation.
+  </td>
+</tr>
+
+<!-- Row: trailing commentary block -->
+<tr>
+  <td class="code-cell">
+    <pre># WHAT TO TAKE AWAY
+# ... (long comment about TRY REFUSING / FAT TOOL / failure modes)...</pre>
+  </td>
+  <td class="expl-cell">
+    Pedagogical notes for the reader:
+    - Try refusing and observe how the model adapts.
+    - Compare behavior with --fat-tool: fewer turns, but far more dangerous if the command is wrong.
+    - Highlights that narrow tools are not just convenience; they’re a permissioning mechanism that makes safety checks tractable.
+  </td>
+</tr>
+
+<!-- Row: final print -->
+<tr>
+  <td class="code-cell">
+    <pre>print()
+print("Finished the walkthrough. Now open ../agent.py - the same loop, with a")
+print("file workspace instead of a Pi, and three tools instead of two.")</pre>
+  </td>
+  <td class="expl-cell">
+    Wraps up by pointing to the next file in the tutorial (agent.py) that reuses this pattern on a local filesystem sandbox with more tools.
+  </td>
+</tr>
+
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

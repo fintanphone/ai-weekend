@@ -1,0 +1,389 @@
+<title>What The Model Actually Sees</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: a vertical narrative — thesis, pipeline, the assembled prompt as the
+   hero moment, the reply, then the three structural failures. */
+:root{
+  --ink:#0E2B2C; --ink-2:#3B5C5C; --ink-3:#6B8687;
+  --paper:#FBFAF6; --surface:#FFFFFF; --rule:#D9E0DD;
+  --teal:#115E59; --teal-soft:#E3EFEC;
+  --amber:#B45309; --amber-soft:#FBEEDC; --amber-rule:#E8B882;
+  --violet:#5B4B8A; --violet-soft:#EDE9F5;
+  --red:#A03524; --red-soft:#F8E8E4;
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ink:#E8EDEB; --ink-2:#AFC2BF; --ink-3:#7E9593;
+  --paper:#0B1716; --surface:#13201F; --rule:#28403E;
+  --teal:#6FC3B4; --teal-soft:#15302D;
+  --amber:#E8A857; --amber-soft:#36281A; --amber-rule:#7A5A2E;
+  --violet:#B3A3E0; --violet-soft:#241F38;
+  --red:#E39080; --red-soft:#331C18;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --ink:#E8EDEB; --ink-2:#AFC2BF; --ink-3:#7E9593;
+  --paper:#0B1716; --surface:#13201F; --rule:#28403E;
+  --teal:#6FC3B4; --teal-soft:#15302D;
+  --amber:#E8A857; --amber-soft:#36281A; --amber-rule:#7A5A2E;
+  --violet:#B3A3E0; --violet-soft:#241F38;
+  --red:#E39080; --red-soft:#331C18;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);
+  font-size:17px;line-height:1.6;margin:0}
+.wrap{max-width:860px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:56px 80px}
+h1,h2,h3,.eyebrow,.lede{font-family:var(--font-display);text-wrap:balance}
+h1{font-size:clamp(2rem,6vw,3.1rem);line-height:1.04;font-weight:700;
+  letter-spacing:-.025em;margin:0 0 20px}
+h2{font-size:clamp(1.3rem,3.4vw,1.75rem);font-weight:600;letter-spacing:-.015em;
+  margin:0 0 6px}
+h3{font-size:1rem;font-weight:600;margin:0 0 6px}
+p{margin:0 0 16px;max-width:66ch}
+.eyebrow{font-size:.68rem;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+.lede{font-size:clamp(1.05rem,2.3vw,1.28rem);line-height:1.45;font-weight:500;
+  color:var(--ink-2);max-width:60ch;margin:0 0 8px}
+section{margin-block:60px}
+.rule{height:1px;background:var(--rule);border:0;margin:0}
+
+/* the one claim the page exists to make */
+.thesis{border-left:4px solid var(--teal);background:var(--teal-soft);
+  padding:22px 24px;margin-block:36px;border-radius:0 6px 6px 0}
+.thesis p{font-family:var(--font-display);font-size:1.12rem;font-weight:600;
+  line-height:1.4;margin:0;color:var(--ink)}
+.thesis p + p{margin-top:12px;font-weight:500;font-family:var(--font-body);
+  font-size:1rem;color:var(--ink-2)}
+
+/* pipeline */
+.pipe{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-block:26px 10px}
+.stage{flex:1 1 150px;min-width:0;background:var(--surface);
+  border:1px solid var(--rule);border-radius:7px;padding:14px 15px}
+.stage.key{border-color:var(--amber-rule);border-width:2px;background:var(--amber-soft)}
+.stage .n{font-family:var(--font-mono);font-size:.68rem;color:var(--ink-3);
+  display:block;margin-bottom:5px}
+.stage .t{font-family:var(--font-display);font-weight:600;font-size:1.02rem;
+  display:block;margin-bottom:7px}
+.stage.key .t{color:var(--amber)}
+.stage .d{font-size:.84rem;line-height:1.42;color:var(--ink-2);display:block}
+.stage .out{font-family:var(--font-mono);font-size:.7rem;color:var(--ink-3);
+  display:block;margin-top:9px;padding-top:8px;border-top:1px solid var(--rule)}
+
+/* code */
+pre{font-family:var(--font-mono);font-size:.78rem;line-height:1.6;margin:0;
+  overflow-x:auto;-webkit-overflow-scrolling:touch}
+.code{background:var(--surface);border:1px solid var(--rule);border-radius:7px;
+  padding:16px 18px;margin-block:18px}
+.cap{font-family:var(--font-display);font-size:.76rem;color:var(--ink-3);
+  margin-top:8px}
+
+/* the assembled prompt — provenance by colour */
+.prompt{border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+  background:var(--surface);margin-block:22px}
+.prompt-head{display:flex;justify-content:space-between;align-items:baseline;
+  gap:12px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--rule);
+  background:var(--paper)}
+.prompt-head .lbl{font-family:var(--font-display);font-weight:600;font-size:.82rem}
+.prompt-head .meta{font-family:var(--font-mono);font-size:.7rem;color:var(--ink-3)}
+.seg{display:flex;gap:0;align-items:stretch}
+.seg .rail{width:4px;flex:0 0 4px}
+.seg .body{flex:1 1 auto;min-width:0;padding:13px 16px}
+.seg.tmpl .rail{background:var(--violet)}
+.seg.tmpl{background:var(--violet-soft)}
+.seg.ret  .rail{background:var(--amber)}
+.seg.ret{background:var(--amber-soft)}
+.seg.q    .rail{background:var(--teal)}
+.seg.q{background:var(--teal-soft)}
+.seg .who{font-family:var(--font-display);font-size:.66rem;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;margin-bottom:7px;display:block}
+.seg.tmpl .who{color:var(--violet)}
+.seg.ret  .who{color:var(--amber)}
+.seg.q    .who{color:var(--teal)}
+.src{font-family:var(--font-mono);font-size:.7rem;color:var(--ink-3);
+  margin:14px 0 3px}
+.src:first-of-type{margin-top:0}
+
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-block:14px;
+  font-family:var(--font-display);font-size:.8rem}
+.legend span{display:flex;align-items:center;gap:7px;color:var(--ink-2)}
+.legend i{width:11px;height:11px;border-radius:2px;flex:0 0 11px}
+
+/* reply */
+.reply{border:1px solid var(--rule);border-left:4px solid var(--ink-3);
+  border-radius:0 7px 7px 0;background:var(--surface);padding:16px 18px;
+  margin-block:20px}
+.reply p{margin:0;max-width:none}
+
+/* not-happening list */
+.nots{display:grid;gap:12px;margin-block:22px;padding:0;list-style:none}
+.nots li{background:var(--surface);border:1px solid var(--rule);border-radius:7px;
+  padding:13px 16px;min-width:0}
+.nots b{font-family:var(--font-display);font-size:.95rem;display:block;
+  margin-bottom:3px}
+.nots span{font-size:.92rem;color:var(--ink-2);line-height:1.45}
+
+/* failures */
+.fail{border:1px solid var(--rule);border-radius:7px;background:var(--surface);
+  padding:16px 18px;margin-bottom:12px;min-width:0}
+.fail-top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.fail-top h3{margin:0;color:var(--red)}
+.blame{font-family:var(--font-mono);font-size:.67rem;letter-spacing:.04em;
+  background:var(--red-soft);color:var(--red);padding:3px 8px;border-radius:999px;
+  white-space:nowrap}
+.fail .q{font-family:var(--font-mono);font-size:.8rem;color:var(--ink-2);
+  margin-bottom:9px;line-height:1.5}
+.fail p{margin:0;font-size:.93rem;color:var(--ink-2);max-width:none}
+
+.foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--rule);
+  font-family:var(--font-display);font-size:.82rem;color:var(--ink-3)}
+.foot code{font-family:var(--font-mono);font-size:.78rem;color:var(--ink-2)}
+
+@media (max-width:560px){
+  body{font-size:16px}
+  .wrap{padding-block:40px 60px}
+  .pipe{flex-direction:column}
+  pre{font-size:.72rem}
+}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Lab 4 · Retrieval</p>
+  <h1>What the model actually sees</h1>
+  <p class="lede">Retrieval-augmented generation has an intimidating name and a
+  mundane mechanism. Here is the literal text that goes in, and the text that
+  comes back.</p>
+
+  <div class="thesis">
+    <p>Nothing is added to the model. No weights change, no training happens,
+    nothing is remembered.</p>
+    <p>Your code looks up some text, pastes it above the question, and sends the
+    whole thing as one ordinary prompt. That is the entire technique.</p>
+  </div>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">The pipeline</p>
+    <h2>Four stages, and only one of them is interesting</h2>
+    <p>Stages one and two happen once, before anyone asks anything. Stages three
+    and four happen per question. The lab's corpus is five short HR policy
+    documents from a fictional freight company.</p>
+
+    <div class="pipe">
+      <div class="stage">
+        <span class="n">01 · once</span>
+        <span class="t">Chunk</span>
+        <span class="d">Split each document into retrievable pieces. Here, on
+        paragraph breaks.</span>
+        <span class="out">→ 20 chunks</span>
+      </div>
+      <div class="stage">
+        <span class="n">02 · once</span>
+        <span class="t">Embed</span>
+        <span class="d">Turn each chunk into a vector that encodes roughly what
+        it is about.</span>
+        <span class="out">→ 20 × 384 floats</span>
+      </div>
+      <div class="stage key">
+        <span class="n">03 · per question</span>
+        <span class="t">Retrieve</span>
+        <span class="d">Embed the question too, then find the chunks whose
+        vectors point the same way.</span>
+        <span class="out">→ top 3</span>
+      </div>
+      <div class="stage">
+        <span class="n">04 · per question</span>
+        <span class="t">Generate</span>
+        <span class="d">Paste those chunks into a prompt alongside the question.
+        Send it.</span>
+        <span class="out">→ ~450 tokens</span>
+      </div>
+    </div>
+
+    <p>Stage three decides what the model <em>can</em> know. Stage four only
+    decides how well it says it. When an answer comes back wrong, almost
+    everyone debugs stage four.</p>
+
+    <div class="code">
+<pre>scores = index @ qvec              <span style="color:var(--ink-3)"># cosine similarity</span>
+top    = np.argsort(scores)[::-1][:k]</pre>
+    </div>
+    <p class="cap">The entire "vector database", as it appears in
+    <code>rag.py</code>. Everything else in the retrieval tooling ecosystem is
+    operational convenience wrapped around those two lines.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">The input</p>
+    <h2>One prompt, assembled from three sources</h2>
+    <p>Somebody types <em>"how many days annual leave do I get?"</em>. Retrieval
+    returns three chunks. Your code glues everything together into a single
+    string and posts it. This is that string, in full — colour-coded by where
+    each part came from.</p>
+
+    <div class="legend">
+      <span><i style="background:var(--violet)"></i>Template you wrote</span>
+      <span><i style="background:var(--amber)"></i>Pasted in 40ms ago</span>
+      <span><i style="background:var(--teal)"></i>What the user typed</span>
+    </div>
+
+    <div class="prompt">
+      <div class="prompt-head">
+        <span class="lbl">POST /v1/chat/completions → messages[0].content</span>
+        <span class="meta">451 tokens</span>
+      </div>
+
+      <div class="seg tmpl">
+        <div class="rail"></div>
+        <div class="body">
+          <span class="who">Template · fixed, every request</span>
+<pre>Answer the question using only the context below. If the context
+does not contain enough information to answer, say so explicitly
+rather than guessing.
+
+Context:</pre>
+        </div>
+      </div>
+
+      <div class="seg ret">
+        <div class="rail"></div>
+        <div class="body">
+          <span class="who">Retrieved · different every request</span>
+          <p class="src">[policy_leave.md] · similarity 0.71</p>
+<pre>Aurora Freight employees accrue 25 days of annual leave per year,
+accruing monthly from the start date. Leave does not carry over
+into the following calendar year except by written exception from
+a director.
+
+---</pre>
+          <p class="src">[policy_leave.md] · similarity 0.63</p>
+<pre>Public holidays are additional to the 25 days and are not
+deducted from the allowance.
+
+---</pre>
+          <p class="src">[handbook_probation.md] · similarity 0.41</p>
+<pre>Annual leave accrues during probation but may not be taken in the
+first two months of employment except in exceptional
+circumstances.</pre>
+        </div>
+      </div>
+
+      <div class="seg q">
+        <div class="rail"></div>
+        <div class="body">
+          <span class="who">Question · appended last</span>
+<pre>Question: how many days annual leave do I get?</pre>
+        </div>
+      </div>
+    </div>
+
+    <p>That is the whole input. There is no second channel, no attachment, no
+    side-loaded knowledge. The orange text was sitting in a file on disk a
+    moment ago and is now simply part of the question.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">The output</p>
+    <h2>An ordinary completion</h2>
+
+    <div class="reply">
+      <p>You accrue 25 days of annual leave per year, accruing monthly from your
+      start date. Public holidays are additional and are not deducted from that
+      allowance. Note that leave does not carry over into the following calendar
+      year without written approval from a director.</p>
+    </div>
+
+    <p>Correct, and grounded — every claim traces back to orange text. But the
+    model did not <em>know</em> any of it. Ask the same question with the
+    retrieval step switched off and you get a confident invention, because
+    nothing in the prompt would have contradicted it.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">Misconceptions</p>
+    <h2>What did not happen</h2>
+    <ul class="nots">
+      <li><b>The model was not trained, fine-tuned or updated.</b>
+      <span>Its weights are identical before and after. Ask the same question
+      tomorrow with the retrieval step removed and it knows nothing.</span></li>
+      <li><b>The documents were not "loaded into" the model.</b>
+      <span>Three paragraphs were pasted into one prompt. The other seventeen
+      chunks were never sent and the model has no idea they exist.</span></li>
+      <li><b>Nothing was remembered.</b>
+      <span>The API is stateless. The next question re-runs retrieval from
+      scratch and re-sends everything it needs.</span></li>
+      <li><b>No search engine was consulted.</b>
+      <span>Similarity here is one matrix multiply against 20 vectors held in
+      memory. At this scale a database would be slower.</span></li>
+    </ul>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">Where it breaks</p>
+    <h2>Three questions this cannot answer</h2>
+    <p>Each of these fails structurally, not because the model is weak. Swapping
+    in a bigger model changes nothing, because the right text never reached the
+    prompt in the first place.</p>
+
+    <div class="fail">
+      <div class="fail-top">
+        <h3>Multi-hop</h3><span class="blame">caused at stage 01 · chunking</span>
+      </div>
+      <p class="q">"What notice period does a Warehouse Supervisor have to give?"</p>
+      <p>The answer needs two facts from two documents — Supervisor is Senior
+      Associate grade, and below-manager grade means one month's notice. No
+      single chunk holds both, and neither scores well against the combined
+      question. Plausible text arrives; the answer is wrong.</p>
+    </div>
+
+    <div class="fail">
+      <div class="fail-top">
+        <h3>Negation</h3><span class="blame">caused at stage 02 · embedding</span>
+      </div>
+      <p class="q">"Which roles cannot work remotely?"</p>
+      <p>Embeddings encode subject matter, not polarity. "May work remotely" and
+      "may not work remotely" sit almost on top of each other in vector space,
+      because they are about the same thing. The exclusion clause does not
+      distinguish itself.</p>
+    </div>
+
+    <div class="fail">
+      <div class="fail-top">
+        <h3>Aggregation</h3><span class="blame">caused at stage 03 · top-k</span>
+      </div>
+      <p class="q">"How many policies mention a monetary limit?"</p>
+      <p>Top-k retrieval returns the three best matches. A question about the
+      whole corpus needs all twenty. Raising k doesn't fix the category of
+      problem — it moves the threshold and inflates every prompt you send.</p>
+    </div>
+
+    <p>The fix for the first one is worth finding yourself: answer "what grade is
+    a Warehouse Supervisor?" first, then use that answer to make a second query.
+    That is retrieval as a tool inside Lab 3's loop rather than a fixed pipeline
+    step — and it is the whole difference between RAG and agentic RAG.</p>
+  </section>
+
+  <p class="foot">Aurora Freight is fictional and so is its HR department. The
+  prompt above is the real output of <code>rag.py</code>'s template with k=3;
+  similarity scores are representative. Run
+  <code>python rag.py --show-chunks "how many days annual leave do I get?"</code>
+  to see your own.</p>
+
+</div>

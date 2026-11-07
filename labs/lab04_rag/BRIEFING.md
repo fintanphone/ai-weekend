@@ -98,6 +98,21 @@ confident and still unhelpful.
 **Stuff the top-k into the prompt with sources.** And instruct the model to say
 when the context is insufficient. Then watch how often it doesn't.
 
+## Open the explainer first
+
+`what-the-model-sees.html` is a single page you can project. It carries the
+real prompt from `rag.py` — template, three retrieved chunks with their
+similarity scores, and the question — with each part colour-coded by source.
+
+Spend three minutes on it before any code. The point it makes faster than you
+can say it: **the orange text was in a file on disk a moment ago and is now
+simply part of the question.** No weights changed. Nothing was loaded into the
+model. Nothing is remembered.
+
+It also ties each of the three failure modes to the stage that causes it —
+chunking, embedding, top-k — which is more useful than listing them as a set of
+quirks.
+
 ## Running the room
 
 Have them read the five policy documents first. They need to know what's in
@@ -123,6 +138,37 @@ for this and it's a better answer than "embeddings are bad at negation".
 **Ask Friend 2:** *a user asks the multi-hop question and gets a confident wrong
 answer. How would you ever find out?* What does monitoring even look like when
 the failure is semantic and the system reports success?
+
+## The local version, and the one command to run first
+
+`rag_local.py` swaps the generator to the GPU. Open by pointing out what did
+*not* change:
+
+> "Half of this lab was already local. sentence-transformers embeds on your CPU
+> and never touches a network. Making RAG 'fully local' means swapping one
+> function."
+
+That matters beyond tidiness: retrieval is now provably identical between the
+two scripts, so any difference in the answer is the generator's doing.
+
+**Run `--no-context` first, before anything else.** Same question, no retrieved
+chunks:
+
+> "Fluent. Confident. Completely invented, about a company that doesn't exist.
+> Nothing in the prompt could have contradicted it, because the prompt contained
+> nothing. *That* is what the retrieval step is buying you."
+
+Then `--grounding`, which is the half-hour that earns its keep. Four
+unanswerable questions, with the prompt explicitly instructing the model to
+admit it. Watch how often it does. The subtle case is the bonus question —
+the corpus mentions bonus eligibility but no amount, so a highly relevant chunk
+comes back containing nothing useful. Smaller and more heavily quantised models
+fail that one.
+
+If you have a second GGUF to hand, run `--grounding` on both. "This model
+invents answers 3 times out of 4 and that one invents 1 time out of 4" is a
+real finding, produced in ten minutes, and it is exactly the shape of the
+benchmarking project in `PORTFOLIO.md`.
 
 ## The punchline
 

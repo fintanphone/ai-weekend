@@ -1,8 +1,8 @@
 # Walkthrough — building the loop one turn at a time
 
-**Saturday 13:45 · first 35 minutes of Lab 3 · one screen, everyone watching**
+**Saturday 13:45 · first 45 minutes of Lab 3 · one screen, everyone watching**
 
-A real task on a (fake) Raspberry Pi, worked up from a single exchange to a
+A real task on a (fake) Raspberry Pi, worked up from a plain function call to a
 complete agent loop. Same style as Lab 2's walkthrough: straight-line code, one
 idea per line, meant to be stepped through in a debugger.
 
@@ -13,12 +13,19 @@ idea per line, meant to be stepped through in a debugger.
 |---|---|
 | `pi_tools.py` | The three tool functions. Read once, then step over |
 | `setup_sandbox.py` | Creates the fake Pi home directory. Run first |
+| `step0_tool_call_dive.py` | **No model at all.** One tool, called six ways, by hand |
 | `step1_one_turn.py` | **One** exchange, in full, then stops — deliberately stuck |
 | `step2_by_hand.py` | All three turns, written out longhand and repetitively |
 | `step3_the_loop.py` | The same thing as a while-loop. ~15 lines |
 | `step4_guardrails.py` | A human gate, plus a tempting shortcut to argue about |
 
 ## Why it's built this way
+
+Step 0 exists to kill the mystery before it forms. People arrive assuming a
+"tool" is some special AI construct. It is a Python function. Step 0 calls one
+six times with no model, no network and no API key anywhere in the file, so
+that by the time a model turns up in step 1 the only new idea is *who chooses
+the arguments*.
 
 Step 2 is the important one, and it is *deliberately bad code* — three
 nearly-identical blocks. By the third one the room should be slightly annoyed.
@@ -44,9 +51,14 @@ two switches rather than one, on purpose.
 ## Setup
 
 ```bash
-python setup_sandbox.py      # create the fake Pi
-python pi_tools.py           # check the tools work on their own
+python setup_sandbox.py           # create the fake Pi
+python pi_tools.py                # check the tools work on their own
+python step0_tool_call_dive.py    # or just start here - it builds its own
 ```
+
+`step0_tool_call_dive.py` is completely self-contained: it carries its own copy
+of the tool, its own sample files, and imports nothing from the other lab
+files. You can email it to someone on its own and it works.
 
 Then the same Eclipse setup as Lab 2's walkthrough — PyDev, breakpoint in the
 left margin, **Debug As → Python Run**, and **F6 to step over**. Never F5 on
@@ -71,6 +83,50 @@ log on, cd, list, delete. Then:
 Four human steps collapse to two tool calls. That gap between how a person
 describes a task and how an agent must perform it is worth five minutes on its
 own.
+
+### step0_tool_call_dive.py
+
+Run it first, before anyone has seen a request body. Six calls to one function:
+
+| | Call | The point |
+|---|---|---|
+| 1 | `list_files()` | Defaults work. It's an ordinary function |
+| 2 | `list_files("~", "*.tmp")` | **The exact call the model makes in step 1** |
+| 3 | `list_files(directory=..., pattern=...)` | Keyword style — how the model's arguments arrive |
+| 4 | `list_files("~", "*.txt")` | A different pattern |
+| 5 | `list_files("~", "*.log")` | Nothing matches |
+| 6 | `list_files("../../../etc")` | Refused |
+
+Open with the deflation:
+
+> "Everyone arrives thinking a tool is some special AI thing. It's a function.
+> Here it is. We're going to call it ourselves six times, and there is no model
+> within a mile of this file."
+
+**Demo 5** returns a *sentence* — `No files matching '*.log' in ~` — not an
+empty string and not an exception:
+
+> "The thing that reads this output is a language model, so write output a
+> model can act on. People return `[]` here and then wonder why the agent gets
+> confused."
+
+**Demo 6** raises `ValueError: path escapes the sandbox`. Stop here:
+
+> "Look where that check lives — inside `_resolve`, in our code. Not in a
+> prompt. Not in an instruction to the model. You cannot secure a tool by
+> asking nicely, and there's no model in this file to ask."
+
+**The ending** prints the JSON the model will send, next to demo 2:
+
+> "Nothing was different about any of those six calls. We picked the arguments.
+> When the model shows up in the next file, exactly one thing changes: it
+> decides what goes in the brackets. That's it. That's the whole difference
+> between this file and an agent."
+
+**One change to the debugger advice.** Everywhere else: F6, never F5. Here it's
+the opposite — when you reach a `list_files(...)` line, press **F5** and walk
+through the body. It's your own code, and going inside it is the point. The
+file's header says so.
 
 ### step1_one_turn.py
 
