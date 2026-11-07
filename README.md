@@ -55,18 +55,32 @@ prompt
 ├── requirements.txt
 ├── .env.example
 └── labs/
+    ├── BRIEFINGS.md           ← facilitator scripts, one per session
+    ├── common/                shared local-backend adapter
+    ├── lab00_foundations/      the Saturday whiteboard session
     ├── lab01_local_serving/    your GPU, measured
     ├── lab02_structured_output/  JSON, and why it matters (API + local)
+    │   └── walkthrough/        3 tiny programs to step through in a debugger
     ├── lab03_agent_loop/       ★ the centrepiece — build it by hand
-    ├── lab04_rag/              retrieval, and watching it fail
+    │   └── walkthrough/        5 programs: a bare function → the full loop (fake Pi)
+    ├── lab04_rag/              retrieval, and watching it fail (API + local)
+    │   └── what-the-model-sees.html  projectable explainer: the real prompt
     ├── lab05_skills/           progressive disclosure, implemented from scratch
     ├── lab06_mcp/              use a server, then write one
     ├── lab07_agentic_coding/   turn an agent loose on a real repo
+    │   └── Agentic-Coding-Intro.pdf  send to participants beforehand
     └── lab08_evals/            the thing that separates demo from system
 ```
 
-Every lab folder has its own `README.md` with: **goal → steps → expected output
-→ if it breaks**. Working solutions live on the `solutions` branch.
+Every lab folder has two documents:
+
+- **`README.md`** — for the person at the keyboard. Goal, steps, expected
+  output, and what to do when it breaks.
+- **`BRIEFING.md`** — for the person explaining it. What to say before laptops
+  open, what to draw, which question to hand to whom, and what to cut when
+  you're behind. [`labs/BRIEFINGS.md`](labs/BRIEFINGS.md) indexes all nine.
+
+Working solutions live on the `solutions` branch.
 
 ### The facilitator folder
 
@@ -100,6 +114,10 @@ The labs deliberately use **two different kinds of model**:
 - **Local models on the GPU** (Lab 1, and comparisons throughout) — for
   understanding inference economics, VRAM, quantisation, and throughput.
 - **A frontier API model** (Labs 2–8) — for the agentic work.
+
+Labs 1 and 2b auto-detect your local backend — llama.cpp (`llama-server`) or
+Ollama, whichever is listening. See `labs/common/local_backend.py`, and run it
+directly to see what it finds.
 
 This split is intentional and worth explaining out loud on Saturday morning.
 Small local models in the 8B range are genuinely unreliable at multi-step tool

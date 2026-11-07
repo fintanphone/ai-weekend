@@ -2,6 +2,11 @@
 
 **75 minutes · pairs, or one screen shared**
 
+**Send [`Agentic-Coding-Intro.pdf`](Agentic-Coding-Intro.pdf) ahead of the
+weekend.** Six pages for anyone who has not watched one of these run: what it
+is, two worked examples, where it goes wrong, and a ten-minute thing to try on
+a repo they already know.
+
 ## Goal
 
 Turn an agent loose on a small, deliberately messy codebase and watch what it's

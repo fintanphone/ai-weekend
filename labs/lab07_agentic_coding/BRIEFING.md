@@ -8,6 +8,20 @@ which is deliberately kept out of the shared repo. Don't read it out.*
 
 ---
 
+## Send the PDF first
+
+`Agentic-Coding-Intro.pdf` is a six-page introduction for people who have never
+watched an agent work. Send it a few days ahead.
+
+It does three things you then don't have to do from the front of the room:
+defines the thing against autocomplete and chat (the loop closing is the whole
+difference), walks the **actual** bug from this lab's sample repo turn by turn,
+and is honest about the broad-refactor failure before anyone gets excited.
+
+It also sets the expectation that you'll insist on a failing test before a fix,
+so that rule arrives as something they already read rather than a rule you made
+up on the day.
+
 ## Open with
 
 > "This is the lab where the thing you learned on Saturday becomes something
