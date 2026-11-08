@@ -280,4 +280,5 @@ def build(out_path):
 
 
 if __name__ == "__main__":
-    build("/home/claude/MCP-Intro.pdf")
+    from pdfkit import publish
+    publish(build, "MCP-Intro.pdf", "lab06_mcp")

@@ -1,48 +1,38 @@
-# PDF sources
+# The lab introductions
 
-The five lab introduction PDFs are generated, not hand-made. The source is
-here so the wording can be changed without starting over.
+All five introduction PDFs in one place, so you can send them out without
+digging through lab folders.
 
-| Script | Produces | Goes in |
+| PDF | Lab | Send it before |
 |---|---|---|
-| `pdf_skills.py` | `Skills-Intro.pdf` | `labs/lab05_skills/` |
-| `pdf_mcp.py` | `MCP-Intro.pdf` | `labs/lab06_mcp/` |
-| `pdf_agentic_coding.py` | `Agentic-Coding-Intro.pdf` | `labs/lab07_agentic_coding/` |
-| `pdf_evals.py` | `Evals-Intro.pdf` | `labs/lab08_evals/` |
-| `pdf_harness.py` | `Harness-Intro.pdf` | `labs/lab09_harness/` |
+| `Skills-Intro.pdf` | 5 — Skills | Sunday morning |
+| `MCP-Intro.pdf` | 6 — MCP | Sunday morning |
+| `Agentic-Coding-Intro.pdf` | 7 — Agentic coding | Sunday afternoon |
+| `Evals-Intro.pdf` | 8 — Evals | Sunday afternoon |
+| `Harness-Intro.pdf` | 9 — Harness | the harness session |
 
-`pdfkit.py` holds everything shared: the palette, the three typefaces, the
-paragraph styles, the cover, the page furniture, and the `callout`,
-`transcript` and `two_col` helpers. Each lab's script adds only its own
-diagrams and its own words.
+Each is five or six pages and takes about ten minutes. They cover what the
+thing is, two worked examples, and where it goes wrong — so the definition
+arrives before the session rather than eating the first ten minutes of it.
 
-## Rebuilding
+A copy of each also sits in its own lab folder, where someone working on that
+lab will look for it. The two are kept in step automatically: the build
+scripts write here first and copy across.
 
-```bash
-pip install reportlab
-python pdf_skills.py        # writes to the current directory
-```
+## Sending them out
 
-Then copy the PDF into its lab folder. The fonts are the ones Linux
-distributions ship as `fonts-crosextra-caladea`, `fonts-dejavu` and Poppins
-from Google Fonts; if a font is missing, `registerFont` fails loudly rather
-than silently substituting.
+The whole set is a reasonable thing to send a few days ahead. If you'd rather
+not send five PDFs at once, the two that do most work are
+**Agentic-Coding-Intro** (the one people are most curious about) and
+**Evals-Intro** (the one they'd never pick up on their own).
 
-## House style, if you add a sixth
+Labs 1 to 4 have no PDF. Local inference, structured output, the agent loop
+and retrieval are better met at the keyboard than on paper — and Lab 4 has
+`what-the-model-sees.html` instead, which is a page to project rather than
+something to read beforehand.
 
-Each one is five or six pages and follows the same spine:
+## Changing them
 
-1. **Cover** — eyebrow, title, one-sentence subtitle, who it's for
-2. **What it actually is** — the definition, with the diagram that carries it
-3. **Example 1** — a worked case, usually as a transcript
-4. **Example 2** — a second case of a *different shape*, not a variation
-5. **Where it goes wrong** — honest, specific, before anyone gets excited
-6. **What to take into the lab** — three callouts, one sentence each
-
-The two examples earn their place by being different kinds of use, not two
-flavours of the same one. For MCP that is exposing a server versus consuming
-one; for evals it is improving a system versus surviving a model change.
-
-Keep the running takeaway honest. Every one of these says where the thing
-fails, and two of them (`pdf_harness.py`, `pdf_mcp.py`) spend a full page
-arguing against over-using it.
+Don't edit the PDFs. They're generated — the source is in
+`../pdf_build_scripts/`, one script per PDF plus a shared design module.
+Change the wording there and rerun; both copies update together.

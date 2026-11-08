@@ -346,3 +346,27 @@ def spiral(c, cx=None, cy=300, r=86, turns=3):
         x, y = cx + (r - 52) * math.cos(a), cy + (r - 52) * math.sin(a)
         p.moveTo(x, y) if s == 0 else p.lineTo(x, y)
     c.drawPath(p)
+
+
+def publish(build_fn, filename, lab_folder):
+    """Build once into pdfs/, then copy into the lab folder.
+
+    Two copies on purpose: pdfs/ is the set you send to participants, and the
+    lab folder is where someone working on that lab will look. This keeps them
+    in step so a rebuild never leaves a stale one behind.
+    """
+    import shutil
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+    collected = repo / "pdfs" / filename
+    collected.parent.mkdir(exist_ok=True)
+
+    build_fn(str(collected))
+
+    beside_lab = repo / "labs" / lab_folder / filename
+    if beside_lab.parent.exists():
+        shutil.copy2(collected, beside_lab)
+        print("  also copied to labs/" + lab_folder + "/")
+    else:
+        print("  (no labs/" + lab_folder + "/ - left only in pdfs/)")

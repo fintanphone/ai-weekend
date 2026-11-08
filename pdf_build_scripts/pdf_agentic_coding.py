@@ -4,6 +4,10 @@ Matches the visual language of Agentic-AI-Weekend-Guide.pdf: petrol + amber,
 Poppins for display, Caladea for body, DejaVu Mono for code.
 """
 
+import sys
+from pathlib import Path as _P
+sys.path.insert(0, str(_P(__file__).parent))
+
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -692,4 +696,5 @@ def build(out_path):
 
 
 if __name__ == "__main__":
-    build("/home/claude/Agentic-Coding-Intro.pdf")
+    from pdfkit import publish
+    publish(build, "Agentic-Coding-Intro.pdf", "lab07_agentic_coding")

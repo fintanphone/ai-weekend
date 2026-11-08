@@ -288,4 +288,5 @@ def build(out_path):
 
 
 if __name__ == "__main__":
-    build("/home/claude/Evals-Intro.pdf")
+    from pdfkit import publish
+    publish(build, "Evals-Intro.pdf", "lab08_evals")

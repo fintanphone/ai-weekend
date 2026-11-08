@@ -294,4 +294,5 @@ def build(out_path):
 
 
 if __name__ == "__main__":
-    build("/home/claude/Harness-Intro.pdf")
+    from pdfkit import publish
+    publish(build, "Harness-Intro.pdf", "lab09_harness")
