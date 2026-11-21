@@ -30,38 +30,95 @@ import requests
 # Detection
 # --------------------------------------------------------------------------
 
-def connect(base_url: str | None = None, timeout: float = 5.0) -> "Backend":
-    """Find whichever local server is listening and return an adapter."""
-    base = (base_url or os.environ.get("LOCAL_API_BASE") or "http://localhost:8080").rstrip("/")
+def connect(base_url: str | None = None, timeout: float = 5.0,
+            announce: bool = True) -> "Backend":
+    """Find whichever local server is listening and return an adapter.
 
-    # llama.cpp: /props is llama.cpp-specific and cheap
-    try:
-        r = requests.get(f"{base}/props", timeout=timeout)
-        if r.ok:
-            props = r.json()
-            name = (props.get("model_path") or "").split("/")[-1] or "llama.cpp model"
-            return LlamaCppBackend(base, name, props)
-    except requests.RequestException:
-        pass
+    If LOCAL_API_BASE (or base_url) is given, that address is the ONLY one
+    tried. Silently falling back to a different server when the one you asked
+    for is down produces benchmark numbers for a model you did not choose —
+    which is worse than an error, because you believe the result.
+    """
+    explicit = base_url or os.environ.get("LOCAL_API_BASE")
+    base = (explicit or "http://localhost:8080").rstrip("/")
 
-    # llama.cpp behind a proxy, or anything else OpenAI-shaped
-    try:
-        r = requests.get(f"{base}/v1/models", timeout=timeout)
-        if r.ok:
-            data = r.json().get("data") or [{}]
-            return LlamaCppBackend(base, data[0].get("id", "unknown"), {})
-    except requests.RequestException:
-        pass
-
-    # Ollama
-    ollama = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-    for candidate in (base, ollama):
+    def _llamacpp(addr):
+        # /props is llama.cpp-specific and cheap
         try:
-            r = requests.get(f"{candidate}/api/tags", timeout=timeout)
+            r = requests.get(f"{addr}/props", timeout=timeout)
             if r.ok:
-                return OllamaBackend(candidate, None)
+                props = r.json()
+                name = ((props.get("model_path") or "").split("/")[-1]
+                        or "llama.cpp model")
+                return LlamaCppBackend(addr, name, props)
         except requests.RequestException:
-            continue
+            pass
+        return None
+
+    def _openai_shaped(addr):
+        """Generic last resort. Must be tried AFTER the specific probes.
+
+        Ollama also serves /v1/models for OpenAI compatibility, so probing
+        this first labels an Ollama server as llama.cpp and loses the
+        model list, the per-model loop and the useful 404.
+        """
+        try:
+            r = requests.get(f"{addr}/v1/models", timeout=timeout)
+            if r.ok:
+                data = r.json().get("data") or [{}]
+                return LlamaCppBackend(addr, data[0].get("id", "unknown"), {})
+        except requests.RequestException:
+            pass
+        return None
+
+    def _ollama(addr):
+        try:
+            r = requests.get(f"{addr}/api/tags", timeout=timeout)
+            if not r.ok:
+                return None
+        except requests.RequestException:
+            return None
+        # /api/tags is the list of models actually pulled on THIS machine.
+        # Guessing a name and hoping it is installed gives a bare 404 later.
+        installed = [m["name"] for m in r.json().get("models", [])
+                     if m.get("name")]
+        if not installed:
+            raise ConnectionError(
+                f"Ollama is running at {addr}, but no models are pulled.\n"
+                f"  Pull one first, e.g.:\n"
+                f"      ollama pull qwen3:8b\n"
+                f"  Then run this again. 'ollama list' shows what you have."
+            )
+        return OllamaBackend(addr, None, installed)
+
+    def _say(be, note=""):
+        if announce:
+            print(f"  → {be.kind} at {be.base}  ·  {be.model_name}{note}")
+        return be
+
+    # An explicitly chosen address is the only one we try.
+    if explicit:
+        be = _llamacpp(base) or _ollama(base) or _openai_shaped(base)
+        if be:
+            return _say(be)
+        raise ConnectionError(
+            f"Nothing is listening at {base}.\n"
+            f"  That address came from LOCAL_API_BASE, so this did NOT fall\n"
+            f"  back to Ollama — a benchmark against a model you did not\n"
+            f"  choose is worse than an error.\n"
+            f"  Start llama-server there, or change LOCAL_API_BASE in .env."
+        )
+
+    # Nothing specified: try the llama.cpp default, then Ollama.
+    be = _llamacpp(base) or _openai_shaped(base)
+    if be:
+        return _say(be)
+
+    ollama = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    be = _ollama(ollama)
+    if be:
+        return _say(be, f"\n     (no llama.cpp server at {base} — using Ollama "
+                        f"instead)")
 
     raise ConnectionError(
         f"No local model server found.\n"
@@ -369,13 +426,50 @@ class LlamaCppBackend(Backend):
 class OllamaBackend(Backend):
     kind = "ollama"
 
-    def __init__(self, base: str, model: str | None):
+    def __init__(self, base: str, model: str | None,
+                 installed: list[str] | None = None):
         self.base = base
-        self.model_name = model or os.environ.get("LOCAL_MODEL_MID", "qwen3:8b")
+        self.installed = installed or []
+        preferred = model or os.environ.get("LOCAL_MODEL_MID", "qwen3:8b")
+        # A preferred name is a preference, not a fact. If it is not pulled on
+        # this machine, use something that is — otherwise every call 404s.
+        if self.installed and preferred not in self.installed:
+            self.model_name = self.installed[0]
+            print(f"  note: {preferred!r} is not pulled here; using "
+                  f"{self.model_name!r}.\n"
+                  f"        'ollama pull {preferred}' if you want that one.")
+        else:
+            self.model_name = preferred
 
     def use_model(self, model: str) -> "OllamaBackend":
+        if self.installed and model not in self.installed:
+            raise ConnectionError(
+                f"Model {model!r} is not pulled on this machine.\n"
+                f"  Installed: {', '.join(self.installed)}\n"
+                f"  Pull it with:  ollama pull {model}"
+            )
         self.model_name = model
         return self
+
+    def _check(self, r) -> None:
+        """Turn Ollama's HTTP errors into something a beginner can act on.
+
+        requests' raise_for_status() discards the response body, and Ollama
+        puts the only useful part of a 404 there: which model is missing.
+        """
+        if r.status_code == 404:
+            try:
+                detail = r.json().get("error", "")
+            except ValueError:
+                detail = (r.text or "").strip()[:200]
+            raise ConnectionError(
+                f"Ollama returned 404 for model {self.model_name!r}.\n"
+                f"  {detail}\n"
+                f"  Installed here: "
+                f"{', '.join(self.installed) if self.installed else '(none)'}\n"
+                f"  Fix:  ollama pull {self.model_name}"
+            )
+        r.raise_for_status()
 
     def probe_schema_support(self) -> str | None:
         return "format"          # Ollama has had this since 0.5
@@ -393,7 +487,7 @@ class OllamaBackend(Backend):
         r = requests.post(f"{self.base}/api/chat", json=body, timeout=600)
         if r.status_code == 400:
             raise NotSupported(r.text[:200])
-        r.raise_for_status()
+        self._check(r)
         data = r.json()
         msg = data.get("message", {})
         return {"text": msg.get("content") or "",
@@ -414,7 +508,7 @@ class OllamaBackend(Backend):
                   "options": {"num_predict": max_tokens, "temperature": 0.3}},
             stream=True, timeout=600,
         )
-        r.raise_for_status()
+        self._check(r)
 
         for line in r.iter_lines():
             if not line:
