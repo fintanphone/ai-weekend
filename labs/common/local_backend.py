@@ -26,6 +26,24 @@ import time
 import requests
 
 
+def auth_headers() -> dict:
+    """Bearer token for the OpenAI-compatible path, when one is configured.
+
+    Deliberately its OWN variable, never ANTHROPIC_API_KEY. LOCAL_API_BASE can
+    point at any third party, and silently forwarding an Anthropic key to
+    whatever is at that address would leak it.
+
+    Unset — the normal case for llama.cpp or Ollama on your own machine — and
+    this returns an empty dict, so no header is sent and nothing changes.
+
+    Set it to use any OpenAI-compatible provider, hosted or local:
+        LOCAL_API_BASE=https://api.openai.com   LOCAL_API_KEY=sk-...
+        LOCAL_API_BASE=https://api.groq.com/openai   LOCAL_API_KEY=gsk_...
+    """
+    key = os.environ.get("LOCAL_API_KEY", "").strip()
+    return {"Authorization": f"Bearer {key}"} if key else {}
+
+
 # --------------------------------------------------------------------------
 # Detection
 # --------------------------------------------------------------------------
@@ -45,7 +63,8 @@ def connect(base_url: str | None = None, timeout: float = 5.0,
     def _llamacpp(addr):
         # /props is llama.cpp-specific and cheap
         try:
-            r = requests.get(f"{addr}/props", timeout=timeout)
+            r = requests.get(f"{addr}/props", headers=auth_headers(),
+                             timeout=timeout)
             if r.ok:
                 props = r.json()
                 name = ((props.get("model_path") or "").split("/")[-1]
@@ -63,10 +82,29 @@ def connect(base_url: str | None = None, timeout: float = 5.0,
         model list, the per-model loop and the useful 404.
         """
         try:
-            r = requests.get(f"{addr}/v1/models", timeout=timeout)
+            r = requests.get(f"{addr}/v1/models", headers=auth_headers(),
+                             timeout=timeout)
+            if r.status_code in (401, 403):
+                # Something IS there; it refused us. Saying "nothing is
+                # listening" would send someone debugging the wrong thing.
+                raise ConnectionError(
+                    f"{addr} rejected the request ({r.status_code}).\n"
+                    f"  That endpoint needs an API key. Set LOCAL_API_KEY in "
+                    f".env\n"
+                    f"  (a separate variable from ANTHROPIC_API_KEY, on "
+                    f"purpose — it is\n"
+                    f"   sent to whatever LOCAL_API_BASE points at)."
+                    + ("" if os.environ.get("LOCAL_API_KEY") else
+                       "\n  LOCAL_API_KEY is currently unset.")
+                )
             if r.ok:
                 data = r.json().get("data") or [{}]
-                return LlamaCppBackend(addr, data[0].get("id", "unknown"), {})
+                # A hosted provider lists many models; honour an explicit
+                # choice before falling back to whatever comes first.
+                want = os.environ.get("LOCAL_MODEL", "").strip()
+                ids = [m.get("id") for m in data if m.get("id")]
+                name = want if want in ids else (ids[0] if ids else "unknown")
+                return LlamaCppBackend(addr, name, {})
         except requests.RequestException:
             pass
         return None
@@ -294,7 +332,8 @@ class LlamaCppBackend(Backend):
     def _apply_template(self, messages: list) -> str:
         """Render messages through the server's chat template."""
         r = requests.post(f"{self.base}/apply-template",
-                          json={"messages": messages}, timeout=60)
+                          json={"messages": messages},
+                          headers=auth_headers(), timeout=60)
         if r.ok:
             data = r.json()
             prompt = data.get("prompt")
@@ -317,7 +356,8 @@ class LlamaCppBackend(Backend):
         if not think:
             body["reasoning_budget"] = 0
 
-        r = requests.post(f"{self.base}/completion", json=body, timeout=600)
+        r = requests.post(f"{self.base}/completion", json=body,
+                          headers=auth_headers(), timeout=600)
         if r.status_code in (400, 404, 501):
             raise NotSupported(r.text[:200])
         r.raise_for_status()
@@ -328,7 +368,8 @@ class LlamaCppBackend(Backend):
 
     def _post(self, payload: dict) -> dict:
         body = {"model": self.model_name, "stream": False, **payload}
-        r = requests.post(f"{self.base}/v1/chat/completions", json=body, timeout=600)
+        r = requests.post(f"{self.base}/v1/chat/completions", json=body,
+                          headers=auth_headers(), timeout=600)
         if r.status_code == 400:
             raise NotSupported(r.text[:200])
         r.raise_for_status()
@@ -390,7 +431,7 @@ class LlamaCppBackend(Backend):
                   "stream": True, "max_tokens": max_tokens, "temperature": 0.3,
                   "chat_template_kwargs": {"enable_thinking": False},
                   "reasoning_budget": 0},
-            stream=True, timeout=600,
+            headers=auth_headers(), stream=True, timeout=600,
         )
         r.raise_for_status()
 
