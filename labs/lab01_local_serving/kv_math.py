@@ -131,6 +131,40 @@ def from_gguf(path):
     )
 
 
+def from_server(url):
+    """What a remote llama-server will tell you over HTTP — which is not enough.
+
+    /v1/models gives n_params and n_embd; /props gives the allocated n_ctx.
+    Neither exposes layer count or KV-head count, so the cache cannot be sized
+    from HTTP alone. Those come from the startup log or the GGUF itself.
+    """
+    url = url.rstrip("/")
+    meta, props = {}, {}
+    try:
+        d = requests.get(f"{url}/v1/models", timeout=10).json()
+        meta = (d.get("data") or [{}])[0].get("meta") or {}
+        name = (d.get("data") or [{}])[0].get("id", url)
+    except (requests.RequestException, ValueError):
+        raise SystemExit(f"No llama-server answering at {url}")
+    try:
+        props = requests.get(f"{url}/props", timeout=10).json()
+    except (requests.RequestException, ValueError):
+        pass
+    gen = (props.get("default_generation_settings") or {})
+    return dict(
+        name=f"{name} (remote)",
+        arch="unknown",
+        params=meta.get("n_params"),
+        quant=_quant_from_name(props.get("model_path", "")),
+        layers=None, heads=None, kv_heads=None,
+        embed=meta.get("n_embd"),
+        key_len=None, val_len=None, attn_interval=None, ssm=None,
+        max_ctx=gen.get("n_ctx") or meta.get("n_ctx_train"),
+        slots=props.get("total_slots"),
+        source=f"llama-server HTTP at {url}  (PARTIAL — see note)",
+    )
+
+
 def _parse_params(text):
     t = text.strip().upper().rstrip("B")
     try:
@@ -151,8 +185,22 @@ def report(m, card_gib, kv_bits):
     head_dim = m["key_len"] or (m["embed"] // m["heads"] if m["embed"] and
                                 m["heads"] else None)
     missing = [k for k in ("layers", "kv_heads", "params") if not m.get(k)]
-    if missing or not head_dim:
-        raise SystemExit(f"Could not read: {', '.join(missing + ([] if head_dim else ['head_dim']))}")
+    if not head_dim:
+        missing.append("head_dim")
+    if missing:
+        flags = {"layers": "--layers", "kv_heads": "--kv-heads",
+                 "params": "--params", "head_dim": "--head-dim"}
+        raise SystemExit(
+            f"\n  Missing: {', '.join(missing)}\n"
+            f"  Source was: {m['source']}\n\n"
+            f"  A remote llama-server does not expose these over HTTP — only\n"
+            f"  n_params and n_embd. Get them one of these ways:\n\n"
+            f"    on the GPU box:  grep -E 'n_layer|n_head_kv|n_embd_head' "
+            f"/tmp/llama-server.log\n"
+            f"    or:              python kv_math.py --gguf /path/to/model.gguf\n\n"
+            f"  Then type them in from anywhere — no server needed:\n"
+            f"    python kv_math.py "
+            + " ".join(f"{flags[k]} N" for k in missing) + "\n")
 
     bpw = BPW.get(str(m["quant"]).upper())
     weights = m["params"] * bpw / 8 if bpw else None
@@ -173,19 +221,24 @@ def report(m, card_gib, kv_bits):
     print(f"\n  {m['name']}   ({m['arch']}, {m['quant']})")
     print(f"  source: {m['source']}\n")
 
-    print("  What `ollama show` already told you")
+    hand = m["arch"] == "manual"
+    print("  The numbers you gave" if hand
+          else "  What the tooling already told you")
     print(f"    parameters        {m['params']/1e9:.1f}B")
     print(f"    quantization      {m['quant']}"
           + (f"   ~{bpw} bits/weight effective" if bpw else "   (unknown bpw)"))
-    print(f"    context length    {m['max_ctx']:,}" if m["max_ctx"] else "")
-    print(f"    embedding length  {m['embed']}")
+    if m["max_ctx"]:
+        print(f"    context length    {m['max_ctx']:,}")
+    if m["embed"]:
+        print(f"    embedding length  {m['embed']}")
 
-    print("\n  What it did NOT tell you")
+    print("" if hand else "\n  What it did NOT tell you")
     print(f"    layers            {m['layers']}")
-    print(f"    attention heads   {m['heads']}")
+    if m["heads"]:
+        print(f"    attention heads   {m['heads']}")
     print(f"    KV heads          {m['kv_heads']}"
-          f"   ({m['heads']//m['kv_heads']}:1 grouped-query)"
-          if m["heads"] and m["kv_heads"] else "")
+          + (f"   ({m['heads']//m['kv_heads']}:1 grouped-query)"
+             if m["heads"] else ""))
     print(f"    head dimension    {k_dim}"
           + ("  (stored, NOT embedding/heads)" if m["key_len"]
              else "   (embedding / heads)"))
@@ -229,15 +282,37 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("model", nargs="?", help="Ollama model name")
     ap.add_argument("--gguf", help="read a .gguf file instead")
+    ap.add_argument("--server", help="a running llama-server URL (partial data)")
     ap.add_argument("--host", default=os.environ.get(
         "OLLAMA_HOST", "http://localhost:11434").rstrip("/"))
+    # Type the numbers in yourself — works with no server at all, which is how
+    # anyone on a laptop explores the model on the big screen.
+    ap.add_argument("--layers", type=int)
+    ap.add_argument("--kv-heads", type=int)
+    ap.add_argument("--head-dim", type=int)
+    ap.add_argument("--params", type=float, help="in billions, e.g. 27")
+    ap.add_argument("--quant", help="e.g. IQ3_M, Q4_K_M")
+    ap.add_argument("--attn-interval", type=int,
+                    help="hybrid models: attention on every Nth layer")
+    ap.add_argument("--max-ctx", type=int)
     ap.add_argument("--card", type=float, default=16, help="VRAM in GiB")
     ap.add_argument("--kv-bits", type=float, default=16,
                     help="KV cache precision: 16, 8, 4...")
     a = ap.parse_args()
 
+    manual = dict(layers=a.layers, kv_heads=a.kv_heads, key_len=a.head_dim,
+                  params=a.params * 1e9 if a.params else None, quant=a.quant,
+                  attn_interval=a.attn_interval, max_ctx=a.max_ctx)
+
     if a.gguf:
         meta = from_gguf(a.gguf)
+    elif a.server:
+        meta = from_server(a.server)
+    elif all(manual[k] for k in ("layers", "kv_heads", "key_len", "params")):
+        # everything given by hand: no server needed at all
+        meta = dict(name="(from the numbers you gave)", arch="manual",
+                    heads=None, embed=None, val_len=None, ssm=None,
+                    source="typed in by hand", **manual)
     else:
         name = a.model
         if not name:
@@ -250,5 +325,10 @@ if __name__ == "__main__":
             print(f"  (no model given — using {name!r}; "
                   f"others: {', '.join(names[1:]) or 'none'})")
         meta = from_ollama(name, a.host)
+
+    # A hand-given value always wins over whatever was detected.
+    for k, v in manual.items():
+        if v is not None:
+            meta[k] = v
 
     report(meta, a.card, a.kv_bits)
