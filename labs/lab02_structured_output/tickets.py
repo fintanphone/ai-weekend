@@ -75,6 +75,49 @@ SCHEMA = {
 
 REQUIRED = set(SCHEMA["required"])
 
+
+# --------------------------------------------------------------------------
+# Schema variants — the experiment that matters most in this lab
+# --------------------------------------------------------------------------
+#
+# SCHEMA above is the "lax" variant, and `reference_id` is the only nullable
+# field in it. Its description also ends with "null if none", which hands the
+# model a documented way to decline.
+#
+# On a hard ticket it takes that way out. Measured on claude-haiku-5-5, the
+# relayed ticket (t9) returned reference_id=null on all three trials, even
+# though a valid reference is present — costing method B three marks that
+# method A, writing free text with no such affordance, scored.
+#
+# The "strict" variant removes BOTH the null type and the escape clause, and
+# nothing else. Run the two against each other:
+#
+#     python structured.py --tier 2 --misses                  # lax
+#     python structured.py --tier 2 --misses --schema strict   # strict
+#
+# The lesson is sharper than "schemas win". A schema guarantees shape. Its
+# ACCURACY is a property of how you wrote it — a nullable type is a permission
+# slip, and a description that lists escape routes will have them used.
+
+def schema(variant: str = "lax") -> dict:
+    """Return the tool schema. variant is 'lax' (default) or 'strict'."""
+    import copy
+
+    s = copy.deepcopy(SCHEMA)
+    if variant == "strict":
+        s["properties"]["reference_id"] = {
+            "type": "string",
+            "description": "This ticket's support reference, format XX-NNNN. "
+                           "Not an invoice number, error code, or a reference "
+                           "quoted from an older closed ticket.",
+        }
+    elif variant != "lax":
+        raise ValueError(f"unknown schema variant {variant!r}: use lax or strict")
+    return s
+
+
+SCHEMA_VARIANTS = ("lax", "strict")
+
 PROMPT_A = """Extract the details from this support ticket as JSON.
 
 {rules}

@@ -29,10 +29,15 @@ load_dotenv()
 MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
 client = anthropic.Anthropic()
 
+# Rebuilt by --schema. See the note above tickets.schema(): the lax variant
+# makes reference_id nullable and tells the model "null if none", and on a hard
+# ticket it accepts that invitation.
+SCHEMA_VARIANT = "lax"
+
 TOOL = {
     "name": "record_ticket",
     "description": "Record a parsed support ticket in the tracking system.",
-    "input_schema": T.SCHEMA,
+    "input_schema": T.schema(SCHEMA_VARIANT),
 }
 
 
@@ -92,7 +97,8 @@ METHODS = [("A: prompt-based", method_a), ("B: tool schema", method_b)]
 def run(trials: int, tier: str, misses: bool) -> None:
     cases = T.select(tier)
     tiers = sorted({c["tier"] for c in cases})
-    print(f"\n  model {MODEL}   tickets {len(cases)} (tier {tier})   trials {trials}\n")
+    print(f"\n  model {MODEL}   tickets {len(cases)} (tier {tier})   "
+          f"trials {trials}   schema {SCHEMA_VARIANT}\n")
 
     header = f"  {'method':<18} {'valid':>13} {'fields right':>14}"
     for ti in tiers:
@@ -173,6 +179,11 @@ if __name__ == "__main__":
     ap.add_argument("--raw", action="store_true",
                     help="disable method A's code-fence repair, to see the "
                          "unaided parse rate")
+    ap.add_argument("--schema", default="lax", choices=T.SCHEMA_VARIANTS,
+                    help="lax (default) makes reference_id nullable and says "
+                         "'null if none'; strict removes both")
     args = ap.parse_args()
     REPAIR["enabled"] = not args.raw
+    SCHEMA_VARIANT = args.schema
+    TOOL["input_schema"] = T.schema(SCHEMA_VARIANT)
     run(args.trials, args.tier, args.misses)
