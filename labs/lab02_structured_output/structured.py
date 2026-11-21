@@ -40,6 +40,12 @@ TOOL = {
 # Method A — ask in the prompt
 # --------------------------------------------------------------------------
 
+# How much work the defensive cleanup is actually doing. On a strong model
+# method A can score 100% while never once returning clean JSON — the repair
+# line is holding it up, and a pass rate alone hides that completely.
+REPAIR = {"fired": 0, "attempts": 0, "enabled": True}
+
+
 def method_a(text: str):
     resp = client.messages.create(
         model=MODEL, max_tokens=600,
@@ -47,10 +53,13 @@ def method_a(text: str):
                    "content": T.PROMPT_A.format(rules=T.RULES, ticket=text)}],
     )
     out = "".join(b.text for b in resp.content if b.type == "text").strip()
+    REPAIR["attempts"] += 1
 
     # The defensive cleanup every codebase ends up with. This is the smell.
     if out.startswith("```"):
-        out = out.split("```")[1].removeprefix("json").strip()
+        REPAIR["fired"] += 1
+        if REPAIR["enabled"]:
+            out = out.split("```")[1].removeprefix("json").strip()
 
     try:
         return json.loads(out)
@@ -124,6 +133,20 @@ def run(trials: int, tier: str, misses: bool) -> None:
             row += f" {(100 * g / p if p else 0):>8.0f}%"
         print(row)
 
+    if REPAIR["attempts"]:
+        n, tot = REPAIR["fired"], REPAIR["attempts"]
+        pct = 100 * n / tot
+        if n == 0:
+            print(f"\n  \033[90mMethod A returned clean JSON every time "
+                  f"({tot} responses) — the repair line never fired.\033[0m")
+        else:
+            state = "repaired" if REPAIR["enabled"] else "LEFT BROKEN (--raw)"
+            print(f"\n  \033[93mMethod A wrapped its answer in a code fence "
+                  f"{n}/{tot} times ({pct:.0f}%) — {state}.\033[0m")
+            print(f"  \033[90mThat is three lines of your code propping up "
+                  f"method A's score. Run --raw to see the\n  rate without "
+                  f"them. Method B needs no such line, on any model.\033[0m")
+
     if misses and all_misses:
         print("\n  \033[93mwhat went wrong\033[0m")
         seen = {}
@@ -147,5 +170,9 @@ if __name__ == "__main__":
     ap.add_argument("--trials", type=int, default=3)
     ap.add_argument("--tier", default="all", choices=["1", "2", "all"])
     ap.add_argument("--misses", action="store_true")
+    ap.add_argument("--raw", action="store_true",
+                    help="disable method A's code-fence repair, to see the "
+                         "unaided parse rate")
     args = ap.parse_args()
+    REPAIR["enabled"] = not args.raw
     run(args.trials, args.tier, args.misses)
