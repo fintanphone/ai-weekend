@@ -1,0 +1,37 @@
+[
+  {
+    "label": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "backend": "llamacpp",
+    "model": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "schema_style": "openai",
+    "trials": 3,
+    "tier": "all",
+    "when": "2026-11-21T18:40:11",
+    "methods": {
+      "A  prompt": {
+        "valid_pct": 100.0,
+        "accuracy_pct": 94.4,
+        "by_tier": {
+          "1": 91.7,
+          "2": 95.8
+        }
+      },
+      "B  schema": {
+        "valid_pct": 100.0,
+        "accuracy_pct": 97.2,
+        "by_tier": {
+          "1": 91.7,
+          "2": 100.0
+        }
+      },
+      "C  tools": {
+        "valid_pct": 100.0,
+        "accuracy_pct": 100.0,
+        "by_tier": {
+          "1": 100.0,
+          "2": 100.0
+        }
+      }
+    }
+  }
+]

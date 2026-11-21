@@ -1,0 +1,52 @@
+[
+  {
+    "label": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "kind": "speed",
+    "model": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "backend": "llamacpp",
+    "ttft_s": 0.511,
+    "tokens_per_s": 18.3,
+    "tokens": 285,
+    "when": "2026-11-21T12:18:20"
+  },
+  {
+    "label": "ollama mistral",
+    "kind": "speed",
+    "model": "mistral:latest",
+    "backend": "ollama",
+    "ttft_s": 0.712,
+    "tokens_per_s": 12.9,
+    "tokens": 269,
+    "when": "2026-11-21T12:57:12"
+  },
+  {
+    "label": "27B IQ3_M",
+    "kind": "speed",
+    "model": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "backend": "llamacpp",
+    "ttft_s": 0.397,
+    "tokens_per_s": 18.3,
+    "tokens": 300,
+    "when": "2026-11-21T15:53:02"
+  },
+  {
+    "label": "gemma4:26b",
+    "kind": "speed",
+    "model": "mistral:latest",
+    "backend": "ollama",
+    "ttft_s": 0.68,
+    "tokens_per_s": 12.9,
+    "tokens": 300,
+    "when": "2026-11-21T16:01:37"
+  },
+  {
+    "label": "llama-server 27B IQ3_M",
+    "kind": "speed",
+    "model": "Qwen3.6-27B-NEO-CODE-HERE-2T-OT-IQ3_M.gguf",
+    "backend": "llamacpp",
+    "ttft_s": 0.319,
+    "tokens_per_s": 18.1,
+    "tokens": 284,
+    "when": "2026-11-21T16:07:50"
+  }
+]
