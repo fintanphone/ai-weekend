@@ -148,6 +148,9 @@ if __name__ == "__main__":
     ap.add_argument("--trials", type=int, default=5)
     ap.add_argument("--compare", action="store_true")
     ap.add_argument("--models", help="Ollama only: comma-separated list to loop over")
+    ap.add_argument("--base", help="server URL for this run only, overriding "
+                                   "LOCAL_API_BASE — e.g. http://gpu-box:11434 "
+                                   "to benchmark Ollama on the same machine")
     args = ap.parse_args()
 
     if args.compare:
@@ -155,7 +158,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     try:
-        backend = connect()
+        backend = connect(args.base)
     except ConnectionError as exc:
         print(f"\n\033[91m{exc}\033[0m\n")
         sys.exit(1)
