@@ -60,13 +60,51 @@ whole skill this lab is about.
 Both work with every lab here: `labs/common/local_backend.py` detects whichever
 is listening and adapts.
 
-## Why the host's machine
+## Why the host's machine — and where each thing runs
 
 The two laptops don't have the interesting hardware. Run this one together, on
 the big screen, with everyone watching `nvidia-smi`.
 
-Laptops should still point at the GPU box so everyone can follow along — see
-**If it breaks** below for the one-line `.env` setting.
+But "together" doesn't mean everyone is idle. Here is what runs where, because
+the two scripts are **not** the same in this respect:
+
+| | On the GPU box | From a laptop |
+|---|---|---|
+| `nvidia-smi` | **Yes — only here** | No. SSH in, or watch the big screen |
+| `bench.py` | Yes | **Yes**, with `LOCAL_API_BASE` set. LAN latency is ~1 ms against a TTFT of hundreds — it does not distort the result |
+| `kv_math.py --gguf` | **Yes — the file is here** | No, unless the `.gguf` is reachable |
+| `kv_math.py` (Ollama) | If Ollama is installed | Only sees **that laptop's own** models |
+| `kv_math.py --layers ... ` | Yes | **Yes — no server needed at all** |
+
+So the honest answer to "do I need to SSH in?":
+
+- **For `nvidia-smi`, yes** — or just watch the shared screen, which is the point
+  of running this lab together.
+- **For `bench.py`, no.** Point `.env` at the GPU box and everyone gets real
+  numbers from their own seat.
+- **For the model metadata, read it out once** on the GPU box, then everyone
+  types it in. A remote `llama-server` exposes `n_params` and `n_embd` over
+  HTTP but **not** layer count or KV heads, so there is no way to fetch it from
+  a laptop. `kv_math.py --server <url>` will tell you exactly that, and print
+  the command to run instead.
+
+That last point is a feature rather than a nuisance. Read the three numbers off
+the screen once:
+
+```bash
+# once, on the GPU box
+grep -E 'n_layer|n_head_kv|n_embd_head' /tmp/llama-server.log
+```
+
+Then everyone explores on their own laptop, with no server and no SSH:
+
+```bash
+python kv_math.py --layers 64 --kv-heads 4 --head-dim 256 \
+                  --params 27 --quant IQ3_M --attn-interval 4 --kv-bits 3
+```
+
+Now they can each change `--card`, `--kv-bits` and `--attn-interval` and watch
+the table move, which is worth far more than watching one person type.
 
 ## Steps
 
@@ -115,8 +153,10 @@ So let the script fetch them and do the sum:
 ```bash
 python kv_math.py                          # whatever Ollama has loaded
 python kv_math.py llama3.1:8b              # a named Ollama model
-python kv_math.py --gguf /path/to/model.gguf   # straight from the file
-python kv_math.py --gguf model.gguf --kv-bits 3  # with a quantised cache
+python kv_math.py --gguf /path/to/model.gguf   # on the GPU box
+python kv_math.py --server http://gpu-box:8080 # partial — tells you what's missing
+python kv_math.py --layers 64 --kv-heads 4 --head-dim 256 \
+                  --params 27 --quant IQ3_M --attn-interval 4   # from anywhere
 ```
 
 **Run it twice, with `--kv-bits 16` then `--kv-bits 3`.** Watch the bottom row
@@ -144,6 +184,27 @@ python bench.py --compare
 Results accumulate in `bench_results.json`, so the comparison survives the
 restarts. On Ollama you can loop in one go with
 `--models qwen3:8b,llama3.2:3b`.
+
+**Benchmarking both backends on the same box** is the most interesting run of
+the lab, and `--base` does it without touching `.env`:
+
+```bash
+python bench.py --label "llama-server 27B IQ3_M"                  # port 8080, from .env
+python bench.py --base http://<gpu-box-ip>:11434 \
+                --models mistral:latest --label "ollama mistral"  # port 11434
+python bench.py --compare
+```
+
+Two things to know before that works:
+
+- **Ollama only listens on localhost by default.** Unlike `start-qwen36.sh`,
+  which already sets `--host 0.0.0.0`, Ollama needs `OLLAMA_HOST=0.0.0.0:11434`
+  in its environment (or systemd unit) on the GPU box, then a restart. Without
+  it, the port is open to the box itself and nothing else.
+- **You are not comparing engines.** Ollama *is* llama.cpp underneath. Any
+  difference you measure is configuration — context size, GPU offload, flash
+  attention, KV precision. That is the point of the comparison, and it is a
+  better lesson than a league table would be.
 
 Record the numbers — you'll want them in Lab 8 when you compare against API
 costs.
