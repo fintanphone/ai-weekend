@@ -181,9 +181,17 @@ if __name__ == "__main__":
                          "unaided parse rate")
     ap.add_argument("--schema", default="lax", choices=T.SCHEMA_VARIANTS,
                     help="lax (default) makes reference_id nullable and says "
-                         "'null if none'; strict removes both")
+                         "'null if none'; strict removes both; honest keeps "
+                         "the null but fixes the prose")
+    ap.add_argument("--model",
+                    help="model for THIS run, overriding WORKSHOP_MODEL in "
+                         ".env — e.g. --model claude-haiku-5-5. An export only "
+                         "lasts as long as the shell; this is explicit and "
+                         "appears in the header.")
     args = ap.parse_args()
     REPAIR["enabled"] = not args.raw
     SCHEMA_VARIANT = args.schema
     TOOL["input_schema"] = T.schema(SCHEMA_VARIANT)
+    if args.model:
+        MODEL = args.model
     run(args.trials, args.tier, args.misses)
