@@ -1,194 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Code Walkthrough — agent.py</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
+<meta charset="UTF-8" />
+<title>Code Walkthrough — agent.py</title>
+<style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
     body {
-      margin: 0;
-      min-height: 100vh;
-      color: #e5e7eb;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-                   "Segoe UI", sans-serif;
-      background:
-        radial-gradient(
-          farthest-corner at top center,
-          #111827 0%,
-          #020617 100%
-        );
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                     sans-serif;
+        color: #e5e7eb;
+        background: radial-gradient(circle at top center, #111827 0%, #020617 100%);
+        padding: 24px 16px;
+        -webkit-font-smoothing: antialiased;
     }
 
     .container {
-      max-width: 1350px;
-      margin: 0 auto;
-      padding: 24px 24px 48px;
-    }
-
-    header {
-      margin-bottom: 16px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
     }
 
     h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: #e5e7eb;
-      margin: 0 0 4px;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #f9fafb;
+        letter-spacing: -0.01em;
+        margin-bottom: 4px;
     }
 
     .subtitle {
-      font-size: 0.92rem;
-      color: #9ca3af;
+        font-size: 0.82rem;
+        color: #6b7280;
+        margin-bottom: 18px;
     }
 
     /* Scroll wrapper */
     .table-wrap {
-      overflow-x: auto;
-      border-radius: 10px;
-      background: rgba(2,6,23,0.85);
-      border: 1px solid rgba(75,85,99,0.6);
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 14px;
+        scrollbar-width: thin;
+        scrollbar-color: #1f2933 #111827;
+    }
+
+    /* Scrollbar for Webkit */
+    .table-wrap::-webkit-scrollbar { height: 6px }
+    .table-wrap::-webkit-scrollbar-track { background: #111827; border-radius: 999px }
+    .table-wrap::-webkit-scrollbar-thumb {
+        background: #1f2933;
+        border-radius: 999px;
     }
 
     table {
-      width: 100%;
-      min-width: 900px;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      white-space: nowrap;
-      table-layout: fixed; /* ensures column widths are respected */
+        width: max(900px, 100%); /* ensures horizontal scroll instead of clipping */
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        line-height: 1.55;
     }
 
-    /* Scrollbar */
-    .table-wrap::-webkit-scrollbar { height: 6px; }
-    .table-wrap::-webkit-scrollbar-track { background: #111827; border-radius: 999px; }
-    .table-wrap::-webkit-scrollbar-thumb {
-      background: rgba(56,189,248,0.35);
-      border-radius: 999px;
-    }
-
-    /* Header */
     thead th {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: #0b1220;
-      color: #38bdf8;
-      font-weight: 600;
-      text-align: left;
-      padding: 9px 14px 9px 14px;
-      border-bottom: 1px solid rgba(75,85,99,0.9);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #020617;
+        color: #38bdf8;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 9px 14px;
+        border-bottom: 1px solid rgba(56,189,248,0.25);
     }
 
-    /* First column (Code) – left */
-    th.code-col,
-    td.code {
-      width: 62%;
-      min-width: 450px;
-      vertical-align: top;
-      background: #020817;
-      border-bottom: 1px solid rgba(55,65,81,0.35);
-    }
+    thead th:first-child { text-align: left; width: 46% }
+    thead th:last-child  { text-align: left; width: 54% }
 
-    /* Second column (Explanation) – right */
-    th.expl-col,
-    td.expl {
-      width: 38%;
-      min-width: 250px;
-      vertical-align: top;
-      padding: 9px 14px 9px 12px;
-      color: #9ca3af;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-                   "Segoe UI", sans-serif;
+    tbody tr {
+        transition: background 0.16s ease-out, box-shadow 0.16s ease-out;
     }
 
     /* Alternating rows */
-    tbody tr:nth-child(odd) td.expl { background: rgba(15,23,42,0.18); }
-    tbody tr:nth-child(even) td.expl { background: rgba(15,23,42,0.36); }
+    tbody tr:nth-child(odd) td   { background-color: rgba(15,23,42,0.70); }
+    tbody tr:nth-child(even) td  { background-color: rgba(15,23,42,0.95); }
 
-    /* Hover */
     tbody tr:hover td {
-      background-color: rgba(15,23,42,0.98);
-      outline: 1px solid rgba(56,189,248,0.15);
-      transition: all 0.18s ease;
+        background-color: rgba(15,23,42,1);
+        box-shadow: inset 0 0 0 1px rgba(56,189,248,0.07);
+    }
+
+    td {
+        padding: 7px 14px;
+        border-bottom: 1px solid rgba(75,85,99,0.35);
+        vertical-align: top;
     }
 
     /* Code cell */
-    td.code pre {
-      margin: 0;
-      padding: 8px 11px 8px 11px;
-      font-size: 0.9rem;
-      line-height: 1.55;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: #e5e7eb;
-      background: #020817;
-      border-radius: 6px;
-      font-family: SF Mono, Menlo, Consolas, "Fira Code", ui-monospace,
-                   monospace;
+    .code-cell {
+        font-family: "SF Mono", Menlo, Consolas, "Liberation Mono",
+                     ui-monospace, monospace;
+        background: #020817;
+        border-radius: 6px;
+        padding: 5px 9px;
+        white-space: pre-wrap;
+        font-size: 0.79rem;
+        line-height: 1.45;
     }
 
-    /* Explanation helpers */
-    td.expl p { margin: 0 0 4px; }
-    td.expl code {
-      font-size: 0.86rem;
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: rgba(15,23,42,0.9);
-      color: #e5e7eb;
+    /* Explanation cell */
+    .exp-cell {
+        color: #9ca3af;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                     sans-serif;
+        font-size: 0.82rem;
+        line-height: 1.55;
     }
 
-    /* Footer */
-    .footer {
-      margin-top: 8px;
-      font-size: 0.76rem;
-      color: #6b7280;
-    }
-  </style>
+</style>
 </head>
 <body>
 <div class="container">
-  <header>
     <h1>Code Walkthrough — agent.py</h1>
-    <div class="subtitle">Minimal “agent” that routes Claude through simple file and math tools via the Anthropic API.</div>
-  </header>
+    <p class="subtitle">A minimal tool-use loop built on Claude, with list_files / read_file / calculate.</p>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="code-col">Code</th>
-          <th class="expl-col">Explanation</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Explanation</th>
+                </tr>
+            </thead>
+            <tbody>
 
-        <!-- Shebang -->
-        <tr>
-          <td class="code"><pre>#!/usr/bin/env python3</pre></td>
-          <td class="expl">Shebang to run this file directly with Python 3 on POSIX systems.</td>
-        </tr>
-
-        <!-- Docstring -->
-        <tr>
-          <td class="code"><pre>"""Lab 3 — an agent, by hand, no frameworks.
-
-This is the whole thing. Everything else in the field is a variation on it.
-
-    python agent.py "How many Python files are in the workspace, and how many
-                     lines does the largest one have?"
-    python agent.py --verbose "..."     # show the raw message list each turn
-
+<!-- DOCTYPE + header comment -->
+<tr>
+    <td class="code-cell">"""
 Read it top to bottom before you run it. It's about 120 lines including the
 tools, and there is nothing hidden.
-"""</pre></td>
-          <td class="expl">Docstring doubles as a README: states intent (no-framework agent), shows example invocations, and warns that the entire design is intentionally simple.</td>
-        </tr>
+"""</td>
+    <td class="exp-cell">Docstring-as-readme: reminds you to read fully; sets expectation that this file is short and straightforward.</td>
+</tr>
 
-        <!-- Imports -->
-        <tr>
-          <td class="code"><pre>import argparse
+<!-- imports -->
+<tr>
+    <td class="code-cell">import argparse
 import json
 import os
 import subprocess
@@ -196,43 +152,32 @@ import sys
 from pathlib import Path
 
 import anthropic
-from dotenv import load_dotenv</pre></td>
-          <td class="expl">Standard library + third-party imports: argument parsing, JSON, OS, subprocess (unused here but common), path handling, Anthropic client, and .env loading for secrets.</td>
-        </tr>
+from dotenv import load_dotenv</td>
+    <td class="exp-cell">Standard and third-party imports: argument parsing, JSON handling, OS/env utilities, subprocess (not used here yet), system exit, path operations, Anthropic client library, and .env loader for secrets.</td>
+</tr>
 
-        <!-- Load env -->
-        <tr>
-          <td class="code"><pre>load_dotenv()</pre></td>
-          <td class="expl">Loads environment variables from .env into os.environ so API keys can be kept out of code.</td>
-        </tr>
+<!-- load_dotenv -->
+<tr>
+    <td class="code-cell">load_dotenv()</td>
+    <td class="exp-cell">Reads a local .env file (if present) into os.environ so API keys / config are available without hardcoding them.</td>
+</tr>
 
-        <!-- Config -->
-        <tr>
-          <td class="code"><pre>MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
-WORKSPACE = Path(__file__).parent / "workspace"</pre></td>
-          <td class="expl">MODEL: reads which Claude model to use, defaulting to claude-sonnet-5. WORKSPACE: a local directory treated as the agent’s “sandboxed” file system.</td>
-        </tr>
+<!-- MODEL, WORKSPACE -->
+<tr>
+    <td class="code-cell">MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
+WORKSPACE = Path(__file__).parent / "workspace"</td>
+    <td class="exp-cell">MODEL: overrides the Claude model via env var; falls back to claude-sonnet-5. WORKSPACE: a directory beside this file used as the agent's sandbox for files.</td>
+</tr>
 
-        <!-- Client -->
-        <tr>
-          <td class="code"><pre>client = anthropic.Anthropic()</pre></td>
-          <td class="expl">Creates an Anthropic client using ANTHROPIC_API_KEY from the environment (set via .env).</td>
-        </tr>
+<!-- client -->
+<tr>
+    <td class="code-cell">client = anthropic.Anthropic()</td>
+    <td class="exp-cell">Initialize Anthropic SDK; it reads API key from ANTHROPIC_API_KEY (or equivalent) in the environment.</td>
+</tr>
 
-        <!-- Section header: tools -->
-        <tr>
-          <td class="code"><pre># ==========================================================================
-# 1. THE TOOLS
-#
-# A tool is two things: a JSON Schema the model reads, and a Python function
-# the model never sees. The model chooses; your code executes. Always.
-# ==========================================================================</pre></td>
-          <td class="expl">Clarifies design pattern: tools are (1) declarative schemas for the model and (2) concrete functions executed server-side.</td>
-        </tr>
-
-        <!-- TOOLS list -->
-        <tr>
-          <td class="code"><pre>TOOLS = [
+<!-- TOOL SCHEMAS: list_files -->
+<tr>
+    <td class="code-cell">TOOLS = [
     {
         "name": "list_files",
         "description": (
@@ -248,13 +193,13 @@ WORKSPACE = Path(__file__).parent / "workspace"</pre></td>
                 }
             },
         },
-    },</pre></td>
-          <td class="expl">list_files tool schema: lets the agent discover workspace files via glob patterns before reading.</td>
-        </tr>
+    }</td>
+    <td class="exp-cell">JSON schema for list_files: lets the model discover files in WORKSPACE via glob patterns; no required fields.</td>
+</tr>
 
-        <!-- read_file -->
-        <tr>
-          <td class="code"><pre>    {
+<!-- TOOL SCHEMAS: read_file -->
+<tr>
+    <td class="code-cell">    {
         "name": "read_file",
         "description": "Read the contents of a text file in the workspace.",
         "input_schema": {
@@ -264,13 +209,13 @@ WORKSPACE = Path(__file__).parent / "workspace"</pre></td>
             },
             "required": ["path"],
         },
-    },</pre></td>
-          <td class="expl">read_file tool schema: allows reading any file in WORKSPACE by relative path; required input is “path”.</td>
-        </tr>
+    }</td>
+    <td class="exp-cell">JSON schema for read_file: asks model to supply a path within WORKSPACE; used when the model needs file contents.</td>
+</tr>
 
-        <!-- calculate -->
-        <tr>
-          <td class="code"><pre>    {
+<!-- TOOL SCHEMAS: calculate -->
+<tr>
+    <td class="code-cell">    {
         "name": "calculate",
         "description": (
             "Evaluate an arithmetic expression. Use this for any arithmetic "
@@ -283,228 +228,241 @@ WORKSPACE = Path(__file__).parent / "workspace"</pre></td>
             },
             "required": ["expression"],
         },
-    },
-]</pre></td>
-          <td class="expl">calculate tool schema: offloads arithmetic to code instead of the model’s internal math.</td>
-        </tr>
+    }</td>
+    <td class="exp-cell">JSON schema for calculate: encourages model to offload math instead of guessing numbers.</td>
+</tr>
 
-        <!-- list_files impl -->
-        <tr>
-          <td class="code"><pre>def tool_list_files(pattern: str = "*") -> str:
-    files = sorted(p for p in WORKSPACE.glob(pattern) if p.is_file())
-    if not files:
-        return f"No files matching {pattern!r}."
-    return "\n".join(f"{p.relative_to(WORKSPACE)} ({p.stat().st_size} bytes)" for p in files)</pre></td>
-          <td class="expl">Implements list_files: glob WORKSPACE, filter to files only, and return a sorted, human-readable summary with sizes.</td>
-        </tr>
+<!-- tool_list_files -->
+<tr>
+    <td class="code-cell">def tool_list_files(pattern: str = "*") -> str:</td>
+    <td class="exp-cell">Entry point used only by Python; model never sees this function, only the schema.</td>
+</tr>
 
-        <!-- read_file impl -->
-        <tr>
-          <td class="code"><pre>def tool_read_file(path: str) -> str:
-    target = (WORKSPACE / path).resolve()
+<tr>
+    <td class="code-cell">    files = sorted(p for p in WORKSPACE.glob(pattern) if p.is_file())</td>
+    <td class="exp-cell">Glob within WORKSPACE using pattern; filter to regular files and sort them (deterministic output).</td>
+</tr>
 
-    # Containment check. Without this, path='../../.env' reads your API key.
-    # Note where this lives: in YOUR code, not in the model's instructions.
-    if not target.is_relative_to(WORKSPACE.resolve()):
-        return "ERROR: path escapes the workspace. Refused."
-    if not target.exists():
-        return f"ERROR: {path} does not exist."
+<tr>
+    <td class="code-cell">    if not files:
+        return f"No files matching {pattern!r}."</td>
+    <td class="exp-cell">If nothing matches, give a clear message instead of silent empty result.</td>
+</tr>
 
-    content = target.read_text(errors="replace")
+<tr>
+    <td class="code-cell">    return "\n".join(f"{p.relative_to(WORKSPACE)} ({p.stat().st_size} bytes)" for p in files)</td>
+    <td class="exp-cell">Return each file as a relative path with its size; model can scan this to decide what to read next.</td>
+</tr>
+
+<!-- tool_read_file -->
+<tr>
+    <td class="code-cell">def tool_read_file(path: str) -> str:</td>
+    <td class="exp-cell">Function implementing the read_file tool for the agent.</td>
+</tr>
+
+<tr>
+    <td class="code-cell">    target = (WORKSPACE / path).resolve()</td>
+    <td class="exp-cell">Join with WORKSPACE and normalize; resolve() is important for detecting directory traversal attempts.</td>
+</tr>
+
+<!-- containment check -->
+<tr>
+    <td class="code-cell">    if not target.is_relative_to(WORKSPACE.resolve()):
+        return "ERROR: path escapes the workspace. Refused."</td>
+    <td class="exp-cell">Security guardrail: rejects any path that resolves outside WORKSPACE (e.g., ../../) to protect host files.</td>
+</tr>
+
+<tr>
+    <td class="code-cell">    if not target.exists():
+        return f"ERROR: {path} does not exist."</td>
+    <td class="exp-cell">Basic existence check; keeps model from hallucinating contents on failure.</td>
+</tr>
+
+<!-- read + truncate -->
+<tr>
+    <td class="code-cell">    content = target.read_text(errors="replace")
     if len(content) > 8000:
         return content[:8000] + f"\n\n[truncated — file is {len(content)} chars]"
-    return content</pre></td>
-          <td class="expl">Implements read_file with safety: resolves absolute path, ensures it never escapes WORKSPACE (security guard), checks existence, reads text safely, and truncates very large files to avoid token overflow.</td>
-        </tr>
+    return content</td>
+    <td class="exp-cell">Read as UTF-8 (with replacement for bad bytes). Truncate very long files to avoid overwhelming context; tell the model it's truncated.</td>
+</tr>
 
-        <!-- calculate impl -->
-        <tr>
-          <td class="code"><pre>def tool_calculate(expression: str) -> str:
-    allowed = set("0123456789+-*/(). ")
+<!-- tool_calculate -->
+<tr>
+    <td class="code-cell">def tool_calculate(expression: str) -> str:</td>
+    <td class="exp-cell">Implements calculate tool using a guarded eval.</td>
+</tr>
+
+<tr>
+    <td class="code-cell">    allowed = set("0123456789+-*/(). ")
     if not set(expression) <= allowed:
-        return "ERROR: expression contains disallowed characters."
-    try:
+        return "ERROR: expression contains disallowed characters."</td>
+    <td class="exp-cell">Whitelist check: only digits and basic math symbols/spacing. Prevents injection via letters or underscores.</td>
+</tr>
+
+<!-- eval line -->
+<tr>
+    <td class="code-cell">    try:
         return str(eval(expression, {"__builtins__": {}}, {}))  # noqa: S307
     except Exception as exc:  # noqa: BLE001
-        return f"ERROR: {exc}"</pre></td>
-          <td class="expl">Implements calculate with a strict allowlist and empty builtins to run only numeric expressions; catches errors instead of leaking stack traces.</td>
-        </tr>
+        return f"ERROR: {exc}"</td>
+    <td class="exp-cell">Safely evaluate in empty namespace; any runtime error is caught and returned as a readable message.</td>
+</tr>
 
-        <!-- DISPATCH -->
-        <tr>
-          <td class="code"><pre>DISPATCH = {
+<!-- DISPATCH -->
+<tr>
+    <td class="code-cell">DISPATCH = {
     "list_files": tool_list_files,
     "read_file": tool_read_file,
     "calculate": tool_calculate,
-}</pre></td>
-          <td class="expl">Map from the model’s chosen tool name to its implementing function; used during loop execution.</td>
-        </tr>
+}</td>
+    <td class="exp-cell">Map from the model-visible tool name to the real Python function that will run.</td>
+</tr>
 
-        <!-- Section header: loop -->
-        <tr>
-          <td class="code"><pre># ==========================================================================
-# 2. THE LOOP
-#
-# This is the agent. Twenty-five lines. That's genuinely all it is.
-# ==========================================================================</pre></td>
-          <td class="expl">Marks where the actual agent loop lives.</td>
-        </tr>
-
-        <!-- SYSTEM prompt -->
-        <tr>
-          <td class="code"><pre>SYSTEM = """You are a careful assistant with access to a small file workspace.
+<!-- SYSTEM prompt -->
+<tr>
+    <td class="code-cell">SYSTEM = """You are a careful assistant with access to a small file workspace.
 
 Work step by step. Use tools rather than guessing — if you need to know what
 files exist, list them; if you need arithmetic, calculate it. When you have
-enough information, give a direct answer and stop calling tools."""</pre></td>
-          <td class="expl">System prompt: instructs the model to be methodical, prefer tool use over guessing, and finish once it has enough info.</td>
-        </tr>
+enough information, give a direct answer and stop calling tools."""</td>
+    <td class="exp-cell">System prompt sets behavior: be methodical, prefer tools over guesswork, and finish decisively once enough is known.</td>
+</tr>
 
-        <!-- run_agent signature -->
-        <tr>
-          <td class="code"><pre>def run_agent(task: str, max_turns: int = 10, verbose: bool = False) -> str:</pre></td>
-          <td class="expl">Core agent routine: takes the user task, a turn limit, and an optional verbose mode; returns the final textual answer.</td>
-        </tr>
+<!-- run_agent signature -->
+<tr>
+    <td class="code-cell">def run_agent(task: str, max_turns: int = 10, verbose: bool = False) -> str:</td>
+    <td class="exp-cell">Core agent loop. task is the user question; max_turns caps how many model interactions are allowed before giving up.</td>
+</tr>
 
-        <!-- Init messages -->
-        <tr>
-          <td class="code"><pre>    messages = [{"role": "user", "content": task]}</pre></td>
-          <td class="expl">Starts conversation history with a single user message containing the task.</td>
-        </tr>
+<!-- messages init -->
+<tr>
+    <td class="code-cell">    messages = [{"role": "user", "content": task}]</td>
+    <td class="exp-cell">Initialize the conversation history with a single user message containing the original task.</td>
+</tr>
 
-        <!-- Loop header -->
-        <tr>
-          <td class="code"><pre>    for turn in range(1, max_turns + 1):
-        print(f"\n\033[90m─── turn {turn} ───\033[0m")</pre></td>
-          <td class="expl">Main loop: one “turn” = one model response plus any tool calls. Prints a labeled separator for readability.</td>
-        </tr>
+<!-- main loop header -->
+<tr>
+    <td class="code-cell">    for turn in range(1, max_turns + 1):
+        print(f"\n\033[90m─── turn {turn} ───\033[0m")</td>
+    <td class="exp-cell">Agent executes up to max_turns; each loop is one "round" of model thinking + tool use.</td>
+</tr>
 
-        <!-- Verbose dump -->
-        <tr>
-          <td class="code"><pre>        if verbose:
-            print(f"\033[90m{json.dumps(messages, indent=2, default=str)[:1500]}\033[0m")</pre></td>
-          <td class="expl">If --verbose is set, dumps the current conversation (truncated) so you can inspect what’s being sent each turn.</td>
-        </tr>
+<!-- verbose dump -->
+<tr>
+    <td class="code-cell">        if verbose:
+            print(f"\033[90m{json.dumps(messages, indent=2, default=str)[:1500]}\033[0m")</td>
+    <td class="exp-cell">Optional debug logging of the full message history (truncated); helps inspect context growth.</td>
+</tr>
 
-        <!-- API call -->
-        <tr>
-          <td class="code"><pre>        response = client.messages.create(
+<!-- call model -->
+<tr>
+    <td class="code-cell">        response = client.messages.create(
             model=MODEL,
             max_tokens=2000,
             system=SYSTEM,
             tools=TOOLS,
             messages=messages,
-        )</pre></td>
-          <td class="expl">Sends the conversation to Claude with tool definitions; response may include text and/or tool_use blocks.</td>
-        </tr>
+        )</td>
+    <td class="exp-cell">Send the conversation to Claude with tool definitions; model can reply in text or request tools.</td>
+</tr>
 
-        <!-- Print assistant text -->
-        <tr>
-          <td class="code"><pre>        for block in response.content:
+<!-- print reasoning -->
+<tr>
+    <td class="code-cell">        for block in response.content:
             if block.type == "text" and block.text.strip():
-                print(f"\033[94m{block.text.strip()}\033[0m")</pre></td>
-          <td class="expl">Prints any assistant text blocks so the user sees intermediate reasoning/answers as they happen.</td>
-        </tr>
+                print(f"\033[94m{block.text.strip()}\033[0m")</td>
+    <td class="exp-cell">Print any text blocks (the model's reasoning / commentary) so you can see how it is thinking.</td>
+</tr>
 
-        <!-- No more tools -->
-        <tr>
-          <td class="code"><pre>        if response.stop_reason != "tool_use":
+<!-- if done -->
+<tr>
+    <td class="code-cell">        if response.stop_reason != "tool_use":
             final = "".join(b.text for b in response.content if b.type == "text")
             print(f"\n\033[92m✓ finished in {turn} turn(s)\033[0m")
-            return final</pre></td>
-          <td class="expl">If Claude stops without requesting tools, treat its concatenated text as the final answer and exit.</td>
-        </tr>
+            return final</td>
+    <td class="exp-cell">If the model stops without requesting tools, it's done; concatenate its text as the answer and exit.</td>
+</tr>
 
-        <!-- Append assistant response -->
-        <tr>
-          <td class="code"><pre>        messages.append({"role": "assistant", "content": response.content})</pre></td>
-          <td class="expl">Because the API is stateless, we must echo back all prior content (including tool_use blocks) so context is preserved.</td>
-        </tr>
+<!-- append assistant -->
+<tr>
+    <td class="code-cell">        messages.append({"role": "assistant", "content": response.content})</td>
+    <td class="exp-cell">Record this turn into history verbatim; otherwise the API's stateless calls would lose context.</td>
+</tr>
 
-        <!-- Execute tools -->
-        <tr>
-          <td class="code"><pre>        results = []
+<!-- run tools -->
+<tr>
+    <td class="code-cell">        results = []
         for block in response.content:
             if block.type != "tool_use":
-                continue</pre></td>
-          <td class="expl">Iterate over content blocks and handle only those that are tool calls.</td>
-        </tr>
+                continue
 
-        <!-- Log call -->
-        <tr>
-          <td class="code"><pre>            print(f"\033[93m→ {block.name}({json.dumps(block.input)})\033[0m")</pre></td>
-          <td class="expl">Log which tool is being called and with what arguments.</td>
-        </tr>
+            print(f"\033[93m→ {block.name}({json.dumps(block.input)})\033[0m")
+            fn = DISPATCH.get(block.name)
+            output = fn(**block.input) if fn else f"ERROR: no tool named {block.name}"</td>
+    <td class="exp-cell">For each tool_use block, look up its handler in DISPATCH and call it with the model-provided args; print invocation.</td>
+</tr>
 
-        <!-- Dispatch -->
-        <tr>
-          <td class="code"><pre>            fn = DISPATCH.get(block.name)
-            output = fn(**block.input) if fn else f"ERROR: no tool named {block.name}"</pre></td>
-          <td class="expl">Look up the function; call it with the model-provided arguments. If unknown, return a safe error string.</td>
-        </tr>
+<!-- preview output -->
+<tr>
+    <td class="code-cell">            preview = output if len(output) < 300 else output[:300] + " […]"
+            print(f"\033[90m← {preview}\033[0m")</td>
+    <td class="exp-cell">Show a short preview of each tool result for visibility.</td>
+</tr>
 
-        <!-- Log output -->
-        <tr>
-          <td class="code"><pre>            preview = output if len(output) < 300 else output[:300] + " […]"
-            print(f"\033[90m← {preview}\033[0m")</pre></td>
-          <td class="expl">Print a short preview of the tool’s result so you can follow execution in terminal.</td>
-        </tr>
-
-        <!-- Build tool_result -->
-        <tr>
-          <td class="code"><pre>            results.append(
+<!-- append tool_result -->
+<tr>
+    <td class="code-cell">            results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": output}
-            )</pre></td>
-          <td class="expl">Package each result with the matching tool_use ID so Claude can correlate outputs to its prior calls.</td>
-        </tr>
+            )
 
-        <!-- Append user-like tool results -->
-        <tr>
-          <td class="code"><pre>        messages.append({"role": "user", "content": results})</pre></td>
-          <td class="expl">Append all tool results as a single “user” message, continuing the conversation with new information.</td>
-        </tr>
+        messages.append({"role": "user", "content": results})</td>
+    <td class="exp-cell">Package results as tool_result entries and inject them back into the conversation under user role so Claude can act on outputs.</td>
+</tr>
 
-        <!-- Turn limit -->
-        <tr>
-          <td class="code"><pre>    return "Hit the turn limit without finishing."</pre></td>
-          <td class="expl">Guard against infinite loops if Claude keeps requesting tools beyond max_turns.</td>
-        </tr>
+<!-- hit limit -->
+<tr>
+    <td class="code-cell">    return "Hit the turn limit without finishing."</td>
+    <td class="exp-cell">If max_turns is exhausted before a final non-tool reply, fail fast with explanation.</td>
+</tr>
 
-        <!-- Argparse setup -->
-        <tr>
-          <td class="code"><pre>if __name__ == "__main__":
+<!-- argparse setup -->
+<tr>
+    <td class="code-cell">if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("task", nargs="?", default=(
         "How many Python files are in the workspace, and how many total lines "
         "do they contain between them?"
-    ))
-    ap.add_argument("--max-turns", type=int, default=10)
+    ))</td>
+    <td class="exp-cell">CLI entrypoint: first positional argument is the task; if omitted, uses a sample question to demonstrate behavior.</td>
+</tr>
+
+<tr>
+    <td class="code-cell">    ap.add_argument("--max-turns", type=int, default=10)
     ap.add_argument("--verbose", action="store_true")
-    args = ap.parse_args()</pre></td>
-          <td class="expl">CLI entrypoint: task is optional (falls back to a sample prompt), plus flags for limits and verbosity.</td>
-        </tr>
+    args = ap.parse_args()</td>
+    <td class="exp-cell">Optional flags: control loop length and enable verbose logging.</td>
+</tr>
 
-        <!-- Workspace check -->
-        <tr>
-          <td class="code"><pre>    if not WORKSPACE.exists():
+<!-- workspace check -->
+<tr>
+    <td class="code-cell">    if not WORKSPACE.exists():
         print(f"Workspace missing. Run: python make_workspace.py", file=sys.stderr)
-        sys.exit(1)</pre></td>
-          <td class="expl">Fail fast and instructively if the expected workspace directory hasn’t been created.</td>
-        </tr>
+        sys.exit(1)</td>
+    <td class="exp-cell">Ensure the sandbox directory exists; otherwise exit with instructions rather than continuing silently.</td>
+</tr>
 
-        <!-- Run -->
-        <tr>
-          <td class="code"><pre>    print(f"\n\033[1mTask:\033[0m {args.task}")
+<!-- final run -->
+<tr>
+    <td class="code-cell">    print(f"\n\033[1mTask:\033[0m {args.task}")
     answer = run_agent(args.task, args.max_turns, args.verbose)
-    print(f"\n\033[1mAnswer:\033[0m {answer}\n")</pre></td>
-          <td class="expl">Print the target task, run the agent loop, then print its final answer. ANSI colors used for readability in terminal.</td>
-        </tr>
+    print(f"\n\033[1mAnswer:\033[0m {answer}\n")</td>
+    <td class="exp-cell">Print the task once, invoke the agent, then print its final answer for easy reading.</td>
+</tr>
 
-      </tbody>
-    </table>
-  </div>
-
-  <div class="footer">Generated as a single-page code walkthrough. No external dependencies.</div>
+            </tbody>
+        </table>
+    </div>
 </div>
 </body>
 </html>
