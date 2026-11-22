@@ -100,23 +100,47 @@ REQUIRED = set(SCHEMA["required"])
 # slip, and a description that lists escape routes will have them used.
 
 def schema(variant: str = "lax") -> dict:
-    """Return the tool schema. variant is 'lax' (default) or 'strict'."""
+    """Return the tool schema. variant is 'lax', 'strict' or 'honest'."""
     import copy
 
     s = copy.deepcopy(SCHEMA)
     if variant == "strict":
+        # Removes the null type AND the escape clause. Measured: recovers most
+        # of t9, but the model then returns the STRING "null" instead - it
+        # routes around the constraint rather than complying.
+        #
+        # Note what this schema now asserts: that every ticket has a reference.
+        # Five of the six tier-2 tickets do not. So on those it forces the model
+        # to invent a value, and norm_ref() quietly forgives "null"/"n/a" as
+        # absence. This variant is a DISHONEST model of the domain, and that is
+        # the point of keeping it: tightening a type cannot fix a prompt problem.
         s["properties"]["reference_id"] = {
             "type": "string",
             "description": "This ticket's support reference, format XX-NNNN. "
                            "Not an invoice number, error code, or a reference "
                            "quoted from an older closed ticket.",
         }
+    elif variant == "honest":
+        # Keeps the null, because the field genuinely IS optional here. Changes
+        # only the prose: a positive instruction first, the exclusions second,
+        # and null framed as the exception rather than an offer.
+        s["properties"]["reference_id"] = {
+            "type": ["string", "null"],
+            "description": "This ticket's own support reference, in the format "
+                           "XX-NNNN. Extract it whenever one is present, "
+                           "including when the ticket was raised on someone "
+                           "else's behalf. Do not use an invoice number, an "
+                           "error code, or a reference quoted from an older "
+                           "closed ticket. Use null only when the ticket "
+                           "contains no reference of its own.",
+        }
     elif variant != "lax":
-        raise ValueError(f"unknown schema variant {variant!r}: use lax or strict")
+        raise ValueError(
+            f"unknown schema variant {variant!r}: use lax, strict or honest")
     return s
 
 
-SCHEMA_VARIANTS = ("lax", "strict")
+SCHEMA_VARIANTS = ("lax", "strict", "honest")
 
 PROMPT_A = """Extract the details from this support ticket as JSON.
 
@@ -242,6 +266,69 @@ TICKETS = [
         Ciara Whelan""",
         "expect": {"surname": "whelan", "company": "harbour point consulting",
                    "reference_id": "hp-2210", "severity": ["medium", "high"]},
+    },
+
+    # ----------------------------------------------------------------------
+    # Company-attribution traps. All four test the same field by different
+    # mechanisms, so you can see WHICH kind of confusion a model is prone to
+    # rather than just that it got one wrong. Severity is deliberately
+    # unambiguous in each, so a severity disagreement cannot be mistaken for
+    # a company error.
+    # ----------------------------------------------------------------------
+    {
+        "id": "t10-brand-as-verb",
+        "tier": 2,
+        "traps": "a famous brand used as a VERB, plus a second as a component maker",
+        "text": """The mains pump on line 2 has stopped and will not restart.
+        Tried to Google the problem but got nowhere, and the Siemens controller
+        is only showing a generic fault code. Bottling is stopped until this is
+        sorted.
+
+        Tomás Nolan
+        Eiris Water Treatment""",
+        "expect": {"surname": "nolan", "company": "eiris water treatment",
+                   "reference_id": None, "severity": ["high", "critical"]},
+    },
+    {
+        "id": "t11-product-brand",
+        "tier": 2,
+        "traps": "two famous brands as products; the writer's company is only in the signature",
+        "text": """I am having problems with my Dell monitor since the Windows
+        update went through. It drops to a black screen every few minutes. I can
+        still work off the laptop screen so it is not urgent, but it is slowing
+        me down.
+
+        Sinéad Barry
+        Clonmel Veterinary Group""",
+        "expect": {"surname": "barry", "company": "clonmel veterinary group",
+                   "reference_id": None, "severity": ["low", "medium"]},
+    },
+    {
+        "id": "t12-employer-is-brand",
+        "tier": 2,
+        "traps": "INVERTED: the writer's employer IS the famous brand, and the vendor is named more often",
+        "text": """Raising this from the service desk side. Our Acme CRM licences
+        stopped validating at 08:40 and none of the sixty agents on shift can log
+        a ticket. Acme's status page says everything is green, which it plainly
+        is not. I manage the desk here at Dell's Limerick site. Our reference is
+        DL-4417.
+
+        Jane Okafor""",
+        "expect": {"surname": "okafor", "company": "dell",
+                   "reference_id": "dl-4417", "severity": ["high", "critical"]},
+    },
+    {
+        "id": "t13-common-noun",
+        "tier": 2,
+        "traps": "the company name also appears as a lowercase everyday word in the body",
+        "text": """The orange warning light on the compressor has been on since
+        Friday and the unit is running hot. We have throttled output as a
+        precaution. Not down yet, but I would rather not wait for it to fail.
+
+        Dervla Hughes
+        Orange Facilities Management""",
+        "expect": {"surname": "hughes", "company": "orange facilities management",
+                   "reference_id": None, "severity": ["medium", "high"]},
     },
 ]
 
