@@ -50,6 +50,40 @@ TOOL = {
 # line is holding it up, and a pass rate alone hides that completely.
 REPAIR = {"fired": 0, "attempts": 0, "enabled": True}
 
+# Transport failures are not model failures, and conflating them silently
+# corrupts the table. METHODS is the OUTER loop, so a rate limit that starts
+# partway through wipes out one whole method and looks like a catastrophic
+# result for it. Measured: a strict-schema run came back 8/30 valid with
+# APIConnectionError on 22 calls, purely because it was the third suite in
+# quick succession.
+#
+# This is Lab 9's reliability concern arriving six labs early. Retries are
+# reported, never hidden — a number you had to retry for is a different number.
+RETRIES = {"count": 0, "gave_up": 0}
+
+
+def call_with_retry(fn, text, attempts: int = 4):
+    """Call fn(text), backing off on transport and rate-limit errors."""
+    import random
+    import time
+
+    for i in range(attempts):
+        try:
+            return fn(text)
+        except Exception as exc:  # noqa: BLE001
+            name = type(exc).__name__
+            transient = name in ("APIConnectionError", "APITimeoutError",
+                                 "RateLimitError", "InternalServerError",
+                                 "APIStatusError", "ConnectionError")
+            if not transient or i == attempts - 1:
+                if transient:
+                    RETRIES["gave_up"] += 1
+                raise
+            RETRIES["count"] += 1
+            # exponential, with jitter so three laptops don't resynchronise
+            time.sleep(2 ** i + random.random())
+    raise RuntimeError("unreachable")
+
 
 def method_a(text: str):
     resp = client.messages.create(
@@ -115,7 +149,7 @@ def run(trials: int, tier: str, misses: bool) -> None:
             for _ in range(trials):
                 attempts += 1
                 try:
-                    result = fn(case["text"])
+                    result = call_with_retry(fn, case["text"])
                 except Exception as exc:  # noqa: BLE001
                     all_misses.append((name, case["id"], type(exc).__name__))
                     continue
@@ -138,6 +172,16 @@ def run(trials: int, tier: str, misses: bool) -> None:
             g, p = per_tier[ti]
             row += f" {(100 * g / p if p else 0):>8.0f}%"
         print(row)
+
+    if RETRIES["count"] or RETRIES["gave_up"]:
+        print(f"\n  \033[93m{RETRIES['count']} call(s) were retried after a "
+              f"transport or rate-limit error"
+              + (f"; {RETRIES['gave_up']} still failed" if RETRIES["gave_up"]
+                 else ", all eventually succeeded")
+              + ".\033[0m")
+        print("  \033[90mThose are not model failures. If any still failed, "
+              "re-run before trusting the\n  numbers — METHODS is the outer "
+              "loop, so a rate limit hits one method, not both.\033[0m")
 
     if REPAIR["attempts"]:
         n, tot = REPAIR["fired"], REPAIR["attempts"]

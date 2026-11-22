@@ -40,12 +40,17 @@ import tickets as T  # noqa: E402
 load_dotenv()
 RESULTS = Path(__file__).parent / "results.json"
 
+# Rebuilt by --schema, same three variants as the API version. Worth running
+# here too: a local 27B has far less slack than a hosted model, so a schema
+# description that merely nudges a frontier model may dominate this one.
+SCHEMA_VARIANT = "lax"
+
 TOOL = [{
     "type": "function",
     "function": {
         "name": "record_ticket",
         "description": "Record a parsed support ticket in the tracking system.",
-        "parameters": T.SCHEMA,
+        "parameters": T.schema(SCHEMA_VARIANT),
     },
 }]
 
@@ -59,7 +64,7 @@ def method_a(be, text: str):
 def method_b(be, text: str):
     out = be.chat([{"role": "user",
                     "content": f"{T.RULES}\n\nParse this support ticket:\n\n{text}"}],
-                  schema=T.SCHEMA)
+                  schema=T.schema(SCHEMA_VARIANT))
     return be.json_from(out)
 
 
@@ -244,7 +249,13 @@ if __name__ == "__main__":
     ap.add_argument("--show", action="store_true", help="print every parsed object")
     ap.add_argument("--misses", action="store_true", help="show which traps caught it")
     ap.add_argument("--compare", action="store_true")
+    ap.add_argument("--schema", default="lax", choices=T.SCHEMA_VARIANTS,
+                    help="lax (default) makes reference_id nullable and says "
+                         "'null if none'; strict removes both; honest keeps "
+                         "the null but fixes the prose")
     args = ap.parse_args()
+    SCHEMA_VARIANT = args.schema
+    TOOL[0]["function"]["parameters"] = T.schema(SCHEMA_VARIANT)
 
     if args.compare:
         compare()
