@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — rag.py</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color: #e5e7eb;
+    background: radial-gradient(ellipse at top, #111827, #020617);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 24px 48px;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin: 0 0 4px;
+  }
+
+  header p.subtitle {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin: 0 0 16px;
+  }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+    font-size: 0.89rem;
+    line-height: 1.55;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #0f172aee;
+    padding: 10px 14px;
+    text-align: left;
+    color: #38bdf8;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(75, 85, 99, 0.35);
+  }
+  tbody tr:nth-child(odd) td {
+    background-color: rgba(15, 23, 42, 0.6);
+  }
+  tbody tr:hover td {
+    background-color: rgba(56, 189, 248, 0.06);
+    transition: background-color 0.18s ease;
+  }
+
+  td:first-child { width: 46%; }
+  td:last-child  { width: 54%; }
+
+  td.code {
+    font-family: "SF Mono", Menlo, Consolas, "ui monospace", monospace;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #e5e7eb;
+    background: #020817;
+    padding: 6px 11px;
+    border-radius: 5px;
+    vertical-align: top;
+  }
+
+  td.expl {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #9ca3af;
+    padding: 6px 14px 6px 10px;
+    vertical-align: top;
+  }
+
+  td.expl strong { color: #e5e7eb; font-weight: 600; }
+
+  .table-wrap::-webkit-scrollbar       { height: 5px; }
+  .table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #1f2933; border-radius: 999px; }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>Code Walkthrough — rag.py</h1>
+  <p class="subtitle">A deliberately minimal RAG demo that uses raw embeddings and an LLM call, then proves where this pattern breaks.</p>
+</header>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th>Code</th>
+  <th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+<td class="code">#!/usr/bin/env python3</td>
+<td class="expl">Standard Unix shebang; lets the file be run directly as an executable from a terminal.</td>
+</tr>
+
+<tr>
+<td class="code">"""Lab 4 — RAG in about a hundred lines, then watching it fail.
+
+    python rag.py "how many days annual leave do I get?"
+    python rag.py --show-chunks "..."     # see what was actually retrieved
+    python rag.py --failures              # run the three questions designed to break it
+
+There is no vector database here on purpose. A vector DB is an index and a
+network hop. The actual retrieval is four lines of numpy, and hiding that
+behind a service makes RAG seem more sophisticated than it is.
+"""</td>
+<td class="expl">Module docstring doubles as README: explains the pedagogical goal (show how simple—and fragile—RAG is), documents CLI usage variants, and justifies omitting a dedicated vector database to expose the core mechanics.</td>
+</tr>
+
+<tr>
+<td class="code">import argparse
+import os
+import re
+from pathlib import Path
+
+import anthropic
+import numpy as np
+from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer</td>
+<td class="expl">Imports:
+- <strong>argparse, os, re:</strong> CLI handling, env vars, text splitting.
+- <strong>pathlib.Path:</strong> filesystem helpers for locating corpus files.
+- <strong>anthropic:</strong> official client to call Claude models (used for generation).
+- <strong>numpy:</strong> used directly for similarity scoring; no extra vector DB layer.
+- <strong>dotenv.load_dotenv:</strong> loads environment variables from a .env file, typically for API keys.</td>
+</tr>
+
+<tr>
+<td class="code">load_dotenv()</td>
+<td class="expl">Reads .env (if present) into the process environment so secrets like <em>ANTHROPIC_API_KEY</em> are available without hardcoding.</td>
+</tr>
+
+<tr>
+<td class="code">MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
+CORPUS = Path(__file__).parent / "corpus"</td>
+<td class="expl">Config:
+- <strong>MODEL:</strong> reads an override from env; defaults to “claude-sonnet-5” (illustrative name).
+- <strong>CORPUS:</strong> path where markdown documents live, relative to this script’s location.</td>
+</tr>
+
+<tr>
+<td class="code">client = anthropic.Anthropic()
+_encoder = None</td>
+<td class="expl">Creates a persistent Anthropic client (uses env auth by default). <strong>_encoder</strong> is a module-level sentinel for lazy-loading the embedding model.</td>
+</tr>
+
+<tr>
+<td class="code">def encoder() -> SentenceTransformer:
+    global _encoder
+    if _encoder is None:
+        print("Loading embedding model (first run downloads ~90MB)...")
+        _encoder = SentenceTransformer("all-MiniLM-L6-v2")
+    return _encoder</td>
+<td class="expl">Lazy loader for the encoder. On first call it:
+- Prints a heads-up that weights (~90 MB) will download on initial use.
+- Instantiates <strong>SentenceTransformer("all-MiniLM-L6-v2")</strong>, a small, fast model good for semantic search.
+Subsequent calls reuse the same instance.</td>
+</tr>
+
+<tr>
+<td class="code">def chunk_corpus() -> list[dict]:
+    chunks = []
+    for path in sorted(CORPUS.glob("*.md")):
+        text = path.read_text()
+        for para in re.split(r"\n\s*\n", text):
+            para = para.strip()
+            if len(para) < 40:
+                continue
+            chunks.append({"source": path.name, "text": para})
+    return chunks</td>
+<td class="expl">Chunking strategy (intentionally simple and instructive):
+- Scans every .md in CORPUS.
+- Splits on blank-line boundaries to isolate paragraphs.
+- Skips very short fragments (<40 chars) to avoid noise like tiny headers.
+Each chunk is a dict with <strong>source</strong> (filename) and <strong>text</strong>. This naive split shows how chunking decisions directly affect what RAG can find.</td>
+</tr>
+
+<tr>
+<td class="code">def build_index(chunks: list[dict]) -> np.ndarray:
+    vectors = encoder().encode([c["text"] for c in chunks], normalize_embeddings=True)
+    return np.asarray(vectors)</td>
+<td class="expl">Turns every chunk into an embedding vector (L2-normalized). Storing them as a NumPy array is the “vector database”: just rows of floats. Cosine similarity then reduces to matrix multiplication.</td>
+</tr>
+
+<tr>
+<td class="code">def retrieve(query: str, chunks, index, k=3):
+    qvec = encoder().encode([query], normalize_embeddings=True)[0]
+    scores = index @ qvec
+    top = np.argsort(scores)[::-1][:k]
+    return [{**chunks[i], "score": float(scores[i])} for i in top]</td>
+<td class="expl">The retrieval core:
+- Embeds the query once.
+- <strong>scores = index @ qvec:</strong> because embeddings are normalized, this dot product is cosine similarity.
+- Takes the top-k chunk indices by score and returns them with their original metadata plus a numeric score.</td>
+</tr>
+
+<tr>
+<td class="code">PROMPT = """Answer the question using only the context below. If the context
+does not contain enough information to answer, say so explicitly rather than
+guessing.
+
+Context:
+{context}
+
+Question: {question}"""</td>
+<td class="expl">System-style prompt injected into user message: enforces “answer from context only” and encourages explicit uncertainty instead of hallucinating when evidence is missing.</td>
+</tr>
+
+<tr>
+<td class="code">def answer(question, retrieved):
+    context = "\n\n---\n\n".join(f"[{c['source']}]\n{c['text']}" for c in retrieved)
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=600,
+        messages=[{"role": "user",
+                   "content": PROMPT.format(context=context, question=question)}],
+    )
+    return "".join(b.text for b in resp.content if b.type == "text")</td>
+<td class="expl">Generation step:
+- Concatenates retrieved chunks with source labels into a context block.
+- Sends the prompt + context + question to Claude (MODEL).
+- max_tokens=600 caps response length.
+- Joins any text content blocks from the API response.</td>
+</tr>
+
+<tr>
+<td class="code">FAILURE_QUESTIONS = [
+    ("multi-hop", "What notice period does a Warehouse Supervisor have to give?", "..."),
+    ("negation",  "Which roles cannot work remotely?", "..."),
+    ("aggregation","How many separate policies mention a monetary limit, and what are they?","...")]</td>
+<td class="expl">Three handcrafted failure modes:
+- <strong>multi-hop:</strong> requires combining facts from different docs.
+- <strong>negation:</strong> relies on exclusions that embeddings don’t distinguish well.
+- <strong>aggregation:</strong> requires seeing the entire corpus, but top-k only returns a few chunks.</td>
+</tr>
+
+<tr>
+<td class="code">def run_failures(chunks, index, show_chunks: bool) -> None:
+    print("\n" + "=" * 72)
+    print("THE THREE QUESTIONS RAG IS BAD AT")
+    ...</td>
+<td class="expl">Header for the “stress test” mode; visually separates these demos from normal questions.</td>
+</tr>
+
+<tr>
+<td class="code">    for kind, question, why in FAILURE_QUESTIONS:
+        print(f"\n\033[1m[{kind}]\033[0m {question}")
+        retrieved = retrieve(question, chunks, index, k=3)
+        ...</td>
+<td class="expl">Loops over each failure scenario; retrieves top-3 candidates and prints them so you can see what RAG “saw.”</td>
+</tr>
+
+<tr>
+<td class="code">        print("\n\033[90mretrieved:\033[0m")
+        for c in retrieved:
+            preview = c["text"][:80].replace("\n", " ")
+            print(f"\033[90m  {c['score']:.3f}  {c['source']:<24} {preview}...\033[0m")
+            if show_chunks:
+                print(f"\033[90m         {c['text']}\033[0m")</td>
+<td class="expl">Prints retrieved chunks with scores and filenames. If --show-chunks is used, dumps full text to help debug why RAG succeeded or failed.</td>
+</tr>
+
+<tr>
+<td class="code">        print(f"\n\033[94m{answer(question, retrieved)}\033[0m")
+        print(f"\n\033[93mwhy this is hard: {why}\033[0m")</td>
+<td class="expl">Shows the model’s answer (in blue) then the instructor note (yellow) explaining why that question exposes RAG limitations.</td>
+</tr>
+
+<tr>
+<td class="code">if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("question", nargs="?")
+    ap.add_argument("-k", type=int, default=3, help="chunks to retrieve")
+    ap.add_argument("--show-chunks", action="store_true")
+    ap.add_argument("--failures", action="store_true")
+    args = ap.parse_args()</td>
+<td class="expl">CLI definition:
+- <strong>question:</strong> optional positional; if omitted, a default question is used.
+- <strong>-k:</strong> number of chunks to retrieve (default 3).
+- <strong>--show-chunks:</strong> verbose mode showing full retrieved text.
+- <strong>--failures:</strong> run the three “known hard” questions instead.</td>
+</tr>
+
+<tr>
+<td class="code">    chunks = chunk_corpus()
+    index = build_index(chunks)
+    print(f"Indexed {len(chunks)} chunks from {len(list(CORPUS.glob('*.md')))} documents.")</td>
+<td class="expl">On every run (for clarity), it:
+- Splits the corpus into chunks.
+- Builds the embedding index.
+This mirrors a real RAG startup but with no caching, emphasizing that the “vector DB” is literally just these two steps.</td>
+</tr>
+
+<tr>
+<td class="code">    if args.failures:
+        run_failures(chunks, index, args.show_chunks)</td>
+<td class="expl">If --failures is passed, bypasses a single question and runs the curated failure scenarios to demonstrate RAG’s weaknesses.</td>
+</tr>
+
+<tr>
+<td class="code">    else:
+        q = args.question or "how many days annual leave do I get?"
+        print(f"\n\033[1mQ:\033[0m {q}\n")
+        retrieved = retrieve(q, chunks, index, args.k)
+        ...</td>
+<td class="expl">Normal mode: use the user’s question (or a default). Prints it, retrieves top-k chunks using configured k.</td>
+</tr>
+
+<tr>
+<td class="code">            print(f"\033[90m  {c['score']:.3f}  {c['source']:<24} {preview}...\033[0m")
+            if args.show_chunks:
+                print(f"\033[90m         {c['text']}\n\033[0m")
+        print(f"\n\033[94m{answer(q, retrieved)}\033[0m\n")</td>
+<td class="expl">Prints a short preview of each retrieved chunk; full text if --show-chunks. Then calls answer() to generate the final response with Claude.</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

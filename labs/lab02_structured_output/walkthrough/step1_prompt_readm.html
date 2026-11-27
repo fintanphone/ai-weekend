@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — step1_ask_for_json.py</title>
+<style>
+  :root {
+    --bg-start: #111827;
+    --bg-end: #020617;
+    --accent: #38bdf8;
+    --code-bg: #020817;
+    --text-muted: #9ca3af;
+    --border-subtle: rgba(148, 163, 184, 0.15);
+    --hover-tint: rgba(56, 189, 248, 0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at top center, var(--bg-start), var(--bg-end));
+    color: #e5e7eb;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 24px;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    color: #f9fafb;
+    margin-bottom: 4px;
+  }
+
+  header p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: rgba(2, 6, 23, 0.95);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.89rem;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #0b1222;
+    color: var(--accent);
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(56,189,248,0.25);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    background-color: rgba(15,23,42,0.15);
+    transition: background-color 0.18s ease;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: rgba(15,23,42,0.3);
+  }
+
+  tbody tr:hover {
+    background-color: var(--hover-tint);
+  }
+
+  td {
+    padding: 7px 9px;
+    border-bottom: 1px solid rgba(148,163,184,0.09);
+    vertical-align: top;
+  }
+
+  td.code-cell {
+    width: 46%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    background: var(--code-bg);
+    border-radius: 5px;
+    padding: 7px 9px;
+    white-space: pre-wrap;
+    color: #cbd5e1;
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  td.expl-cell {
+    width: 54%;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-muted);
+    line-height: 1.52;
+  }
+
+  .table-wrapper::-webkit-scrollbar { height: 6px; width: 6px; }
+  .table-wrapper::-webkit-scrollbar-track { background: transparent; }
+  .table-wrapper::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 999px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Code Walkthrough — step1_ask_for_json.py</h1>
+    <p>Demo script showing how to ask an LLM for JSON via HTTP, inspect the response step-by-step, and surface common failure modes when relying purely on natural-language instructions.</p>
+  </header>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Explanation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="code-cell">#!/usr/bin/env python3
+# =============================================================================
+#  STEP 1 of 3  —  ASKING FOR JSON IN THE PROMPT
+# ...</td>
+          <td class="expl-cell">Shebang for direct execution. Header comments frame this as Step 1: illustrating how to ask a model for structured JSON using only a prompt, and why that alone is fragile.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">import json
+import requests
+
+PAUSE = True
+SERVER = "http://localhost:8080"</td>
+          <td class="expl-cell">Imports for JSON handling and HTTP calls. PAUSE controls interactive pauses; SERVER points to a local inference endpoint (e.g., llama.cpp/Open WebUI-style).</td>
+        </tr>
+        <tr>
+          <td class="code-cell">def pause(note):
+    print()
+    print("    " + "-" * 66)
+    if PAUSE:
+        input("    >>> " + note + "   (press Enter to continue) ")
+    else:
+        print("    >>> " + note)
+    print("    " + "-" * 66)
+    print()</td>
+          <td class="expl-cell">Utility that segments output. When PAUSE is True, it blocks on Enter so learners can inspect prints/debugger state; otherwise just logs a separator.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 1  —  The raw material
+ticket_text = (
+    "Hi, this is Dervla Nolan from Aurora Freight. Our API integration "
+    "started returning 502s at about 14:30 yesterday..."
+)</td>
+          <td class="expl-cell">Simulated support ticket. Intentionally informal and noisy; used as the raw material to test how well a model can extract structured fields from messy human text.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">print("THE TICKET AS THE CUSTOMER WROTE IT")
+print()
+print(ticket_text)
+
+pause("That is the input. It is just a string. Now we wrap instructions round it.")</td>
+          <td class="expl-cell">Echoes the raw ticket so learners confirm exactly what’s being fed in before adding instructions or prompts.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 2  —  Build the instruction
+instruction = (
+    "Extract the details from this support ticket.\n"
+    "\n"
+    "Return ONLY a JSON object with these three keys:\n"
+    "  customer_name  - the person who wrote in\n"
+    "  company        - the organisation they belong to\n"
+    "  severity       - one of: low, medium, high, critical\n"
+    "\n"
+    "No explanation. No code fences. Just the JSON.\n"
+)</td>
+          <td class="expl-cell">Defines explicit constraints: request exactly three fields as JSON and forbid extra prose or formatting. This is a common pattern to encourage machine-readable output.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">prompt = instruction + "\nTicket:\n" + ticket_text
+
+print("THE FULL TEXT WE ARE ABOUT TO SEND TO THE MODEL")
+print()
+print(prompt)
+
+pause("This whole string is the input. The model sees nothing else.")</td>
+          <td class="expl-cell">Concatenates instructions with the raw ticket into a single message. Emphasizes that this complete block is all context the model receives.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 3  —  Build the request
+user_message = {}
+user_message["role"] = "user"
+user_message["content"] = prompt
+
+messages_list = []
+messages_list.append(user_message)</td>
+          <td class="expl-cell">Builds a chat-style payload step-by-step for debugger visibility. Creates one “user” message containing the full prompt.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">request_body = {}
+request_body["model"] = "local-model"      # llama.cpp ignores this, but the API wants it
+request_body["messages"] = messages_list
+request_body["temperature"] = 0.0          # 0.0 = as predictable as possible
+request_body["max_tokens"] = 800</td>
+          <td class="expl-cell">Assembles a standard OpenAI-compatible request body. temperature=0.0 reduces randomness; max_tokens caps response length to avoid runaway generation.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># --- turn the model's "thinking mode" off -----------------------------------
+request_body["chat_template_kwargs"] = {"enable_thinking": False}
+request_body["reasoning_budget"] = 0</td>
+          <td class="expl-cell">Explicitly disables extended internal reasoning/chain-of-thought in hybrid models, preventing verbose scratchpad text from consuming tokens or delaying the answer.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">print("THE REQUEST BODY, AS JSON")
+print()
+print(json.dumps(request_body, indent=2))
+
+pause("That dictionary is literally what travels over the network.")</td>
+          <td class="expl-cell">Prints the exact payload that will be POSTed so learners can inspect and validate it before making the actual request.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 4  —  Send it
+url = SERVER + "/v1/chat/completions"
+
+print("Sending to " + url + " ...")
+
+response = requests.post(url, json=request_body, timeout=120)</td>
+          <td class="expl-cell">Calls a standard chat completions endpoint with the JSON body and a long timeout (local inference can be slow). The HTTP response is stored in `response`.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">print("HTTP status code:", response.status_code)     # 200 means it worked
+
+pause("We have a response object. Now we dig the answer out of it.")</td>
+          <td class="expl-cell">Logs the HTTP status to confirm success before parsing; 200 indicates the server accepted and processed the request.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 5  —  Unpack the response, one layer at a time
+response_json = response.json()
+
+print("THE WHOLE REPLY")
+print()
+print(json.dumps(response_json, indent=2))
+print()</td>
+          <td class="expl-cell">Deserializes and prints the full JSON reply so learners can see its nested structure before extracting pieces.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">choices_list = response_json["choices"]      # a list of possible answers
+first_choice = choices_list[0]               # we only asked for one
+message_object = first_choice["message"]     # the assistant's message
+reply_text = message_object["content"]       # the actual words</td>
+          <td class="expl-cell">Navigates nested fields step-by-step to isolate the model’s primary response text, making it easier to trace in a debugger.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># Why the model stopped. "stop" vs "length". Always worth checking.
+finish_reason = first_choice.get("finish_reason")
+
+print("Why the model stopped :", finish_reason)
+print()</td>
+          <td class="expl-cell">Captures how generation ended: “stop” means normal completion; “length” means it hit max_tokens and may be truncated—critical for reliability.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># Some servers put internal monologue in its own field.
+thinking = message_object.get("reasoning_content")
+
+if thinking:
+    print("The model also produced", len(thinking), "characters of private")
+    print("thinking, in a separate 'reasoning_content' field...")
+    ...</td>
+          <td class="expl-cell">Some endpoints expose a separate reasoning/scratchpad field. If non-empty here, the earlier disable flags didn’t take effect and tokens were spent on internal thought, not the answer.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">print("JUST THE TEXT THE MODEL PRODUCED")
+print()
+print(repr(reply_text))                      # repr() shows hidden characters
+
+pause("Look closely. Is that clean JSON, or is there something round it?")</td>
+          <td class="expl-cell">Uses `repr()` to reveal newlines, quotes, markdown fences, or extra prose that might look fine in a terminal but will break strict JSON parsing.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  SECTION 6  —  Try to turn the text into data
+print("Attempting json.loads() ...")
+parsed = None
+
+try:
+    parsed = json.loads(reply_text)
+
+except json.JSONDecodeError as error:
+    print("FAILED - that string was not valid JSON.")
+    ...</td>
+          <td class="expl-cell">Core validation step. `json.loads()` enforces real JSON; if it fails, the script branches into targeted diagnostics instead of silently proceeding with bad data.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">    if finish_reason == "length":
+        print("   DIAGNOSIS: truncation.")
+        ...</td>
+          <td class="expl-cell">If cut off by `max_tokens`, the JSON was never finished; suggests increasing token budget or ensuring reasoning mode is disabled so tokens go to actual output.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">    elif reply_text.strip() == "":
+        print("   DIAGNOSIS: empty reply.")
+        ...</td>
+          <td class="expl-cell">Empty content with a full thinking budget implies the model spent all its turns “thinking” and never wrote an answer, indicating flags in section 3 were ignored.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">    elif "{" in reply_text:
+        print("   DIAGNOSIS: the JSON is in there, with something wrapped round it.")
+        ...</td>
+          <td class="expl-cell">Model added conversational text or code fences around valid JSON, breaking strict parsing. Shows why “please return only JSON” is unreliable without a schema layer.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">    else:
+        print("   DIAGNOSIS: no JSON at all. The model answered in prose...")</td>
+          <td class="expl-cell">Model ignored the instruction and answered in prose or refused, highlighting that natural-language prompts alone do not guarantee structure.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">else:
+    print("SUCCESS - we now have real data:")
+    ...
+    print(parsed["customer_name"], parsed["company"], parsed["severity"])
+    ...</td>
+          <td class="expl-cell">On success, prints extracted fields to confirm they match expectations—but then warns that this is compliance/probability, not a guarantee.</td>
+        </tr>
+        <tr>
+          <td class="code-cell">pause("Run this file four or five times. Do you get the same thing every time?")</td>
+          <td class="expl-cell">Encourages repeated runs to expose non-determinism and brittle reliance on model “cooperation,” motivating a stricter approach in step 2.</td>
+        </tr>
+        <tr>
+          <td class="code-cell"># =============================================================================
+#  WHAT TO TAKE AWAY
+# ... (summary comments)
+print()
+print("Finished. Next:  python step2_schema.py")
+print()</td>
+          <td class="expl-cell">Reinforces that polite prompting is probabilistic; outlines risks (preambles, hallucinated keys, long reasoning) and transitions learners to a schema-driven solution in the next script.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>
