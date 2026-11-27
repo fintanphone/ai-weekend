@@ -1,0 +1,57 @@
+Lab Five. Skills, and progressive disclosure.
+
+Let me start by deflating this one, because the deflation is the lesson.
+
+A skill is a folder with a markdown file in it. That is the entire format. There's no compilation step, no registration, no framework, no library to install. A short header at the top of the file giving a name and a one line description, then instructions written in plain prose underneath.
+
+So the interesting part isn't the file. The interesting part is when it gets loaded.
+
+Here's the problem it solves. Context is the scarce resource. Everything competes for it — your system prompt, the conversation history, your tool schemas, retrieved documents, tool results — and you pay for all of it on every single request, because the API is stateless and remembers nothing between calls.
+
+Now suppose your organisation has procedures. How you profile a data file. How you write release notes. What a code review has to cover. How an incident report is structured. You want the model to follow them exactly, the same way, every time.
+
+The obvious approach is to put them in the system prompt. So try the arithmetic on that. Twenty procedures, at two thousand tokens each, is forty thousand tokens attached to every request you ever make, whether the request has anything to do with them or not. That's the problem. Skills are the answer to it.
+
+The mechanism is called progressive disclosure, and it has three levels.
+
+At level one, all that's loaded is the name and the one line description. About fifty tokens per skill. That's always present, for every skill you have.
+
+At level two, the full body of instructions gets loaded, and only when the model judges it relevant to what's being asked.
+
+At level three, any scripts, templates or reference files in the folder get read, and only if the instructions themselves call for them.
+
+Now here's the sentence worth stopping on. The model is doing the routing. You are not writing an if statement. Nothing in your code decides which procedure applies. You give the model a list of one line descriptions and it picks.
+
+That has a consequence most people don't anticipate, and it's the single most common mistake in writing a first skill. Because level one is all the model ever sees when deciding, the description line is the most important line in the entire file. A vague description never fires. And the failure is invisible — the skill just silently never gets used, you conclude that skills don't work, and you go back to pasting things into prompts.
+
+So write descriptions as "use this when the user asks about" and then name the actual triggering nouns. Not "formats things nicely". That will never fire, ever.
+
+The lab implements the whole mechanism from scratch in about fifty lines, specifically so there's nowhere for magic to hide. Read only the header of each file at startup and keep the name and description. Put those descriptions in the system prompt. Offer the model one tool that reads the full body of a named skill. Account for the tokens as you go.
+
+Four small pieces. And when it clicks that the entire skills system is a list of descriptions in a prompt plus a file reading tool, the concept stops being intimidating and becomes something you'll actually use next week.
+
+What to do in the session. Run the same task twice, and watch the contrast.
+
+First, with skills switched off, ask it to profile a data file. You get a reasonable profile. Perfectly fine, genuinely useful, and completely non standard — a different shape every time you ask.
+
+Then run it again with skills on, and watch the trace rather than the output. The model sees a single line of description, decides it's relevant, calls the tool to read the skill, gets the full procedure back, and then follows it exactly. Right down to the severity prefixes on each finding, and the rule that identifier columns must never be summed.
+
+Nobody told it to use that skill. The description did the work. That's the moment of the lab.
+
+Then check the accounting, which shows how few characters went up front against how much the bodies actually contain. Then imagine twenty skills instead of two, and the economics become obvious.
+
+Now the thing people skip, which you shouldn't. Check that it doesn't over fire. Ask it to just list the files in the directory. Neither skill should load. A skill that triggers when it shouldn't is a real failure mode — it costs you tokens and it drags irrelevant instructions into the context. Test that a skill fires, and test that it doesn't over fire. Both matter, and only the first one is fun.
+
+Then twenty minutes writing your own, for something you genuinely do. A code review checklist. A bug report format. A commit message convention. A way you like status updates structured.
+
+Three rules, learned the hard way. The description is a routing decision, so write it as "use this when" and name the nouns. Be prescriptive in the body — skills that say "consider using a table" get ignored, and skills that say "output a table with exactly these columns" get followed. And include the negative rules, because a line like "never speculate about business meaning" does real work.
+
+Then swap with your partner and run each other's. Watching your own carefully written description fail to trigger on somebody else's phrasing is the single fastest way to learn what a good one looks like. Nothing else teaches it as quickly.
+
+One last thing worth discussing, because it's a real question without a settled answer. A skill is instructions that a model will follow. So what happens if somebody commits a malicious one? What is your review process for a file that is, functionally, executable?
+
+Two sentences for the board. Skills are how you buy capability without paying context for it up front. The description does the routing; the body does the work.
+
+And the reason they're worth deploying rather than just interesting: with skills on, the output is rigidly consistent across runs. Without them, it's fine but different every time. That consistency is the product. It's the thing that makes a skill something you can hand to a team of thirty people.
+
+That's Lab Five.

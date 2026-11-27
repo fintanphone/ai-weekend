@@ -1,0 +1,61 @@
+Lab Eight. Evals, guardrails and cost.
+
+This is the least glamorous hour of the whole thing, and it is the most valuable. I want to be direct about why before you start.
+
+Almost everybody can build an agent now. You could, as of a few hours ago. Very few people can tell you whether theirs actually works, and almost nobody can prove that a change made it better. That gap is where the jobs are, and it's where the difference lies between people who demo and people who ship.
+
+Here's the situation the lab puts you in. You built an agent. You want to improve it. So you change a prompt, you try it once, and it feels better.
+
+Does it work better? You have absolutely no idea. You might have fixed one thing and broken two others, and you would never know, because you tested by vibes.
+
+Without a suite, every change you make is a guess you cannot evaluate. With one, you have a number, and the number moves.
+
+The suite here is twelve cases run against the agent you built earlier, with three different versions of the system prompt. And I want to say something explicitly about that size, because it's the thing that stops people starting.
+
+Twelve cases in a file is a real eval suite. People assume evals means hundreds of cases and a framework and a platform, and that assumption is precisely why they never write the first one. Twelve is a genuine starting point. Start there.
+
+There are three kinds of scoring, and they come in a clear order of preference.
+
+First, deterministic checks. Does the answer contain this string, this number, this name. They're cheap, they're instant, they never drift, and they need no model at all. Use them anywhere the answer contains a checkable fact.
+
+Second, a model grading against a rubric. You need this when the answer is prose and there's no substring to look for. But be clear eyed about it: a model judge is biased toward longer answers, it's inconsistent between runs, and it costs real money at volume. If you use one, spot check the judge against your own grading on ten cases before you trust it. That one instruction is the difference between an eval suite and a comfortable illusion.
+
+Third, both. Run the cheap deterministic gate first, and only pay the judge for what survives it.
+
+Now, the single most important case in the suite. It's called refusal honesty, and it asks the agent for information that does not exist anywhere in its workspace.
+
+Inventing a plausible number is the failure mode that destroys trust in a system entirely. And it will never, ever show up in happy path testing, because nobody writes a happy path test for a question their data cannot answer. You have to deliberately go looking for it.
+
+If that sounds familiar, it should. It's the same failure you met in the structured output lab, where a record was perfectly formed and quietly wrong, and again in the retrieval lab, where the answer was fluent and confident and invented. Same failure, third costume.
+
+The mechanics are simple. Get a baseline number first, before any discussion. Note the score, and note the token totals, and read the failures printed underneath, because a score of nine out of twelve is useless without knowing which three and why.
+
+Then change one thing and measure again. One of the variants adds a single instruction about not inventing figures. See what that buys you, and see what it costs in tokens. Then put all three side by side.
+
+Then say the sentence out loud, because it's an interview answer: "I took it from this percentage to that percentage, and here is which change bought each increment." Very few candidates can say that sentence about anything they've built.
+
+Then spend fifteen minutes writing your own cases. Add three. One the agent currently passes, as a regression guard. One you expect it to fail. And one adversarial — a question with a false premise, or asking for something that doesn't exist.
+
+Then run them, and check whether you were right about which would fail. Being wrong about that is the most useful thing that can happen in this hour.
+
+The second half is twenty five minutes at a whiteboard with the laptops closed, working through three things against the agent you actually built.
+
+Prompt injection. You already saw it: an instruction hidden inside a data file, and the model followed it. Untrusted content is data, not instruction, and only your code can enforce that distinction. Notice that the containment check held even when the model was completely fooled, because the security lived in the tool implementation rather than in the prompt. Then ask the harder question: which of our tools would be dangerous if the model were fully controlled by an adversary? Design for that case, because that is the case.
+
+Tool permissioning. The model can only ever choose from the tools you gave it, which makes the tool list your primary control surface. Narrow beats general — that's the database argument from the protocol lab, arriving again. Then decide which actions need a human in the loop. The honest rule is: anything irreversible, anything that spends money, anything that touches a third party. Read only by default, write access as a deliberate exception.
+
+And cost. Take the real token totals from your eval run and work out the actual number at current rates. Then the thing that surprises everyone: because the API is stateless, every turn resends the entire history. So a ten turn conversation is not ten units of cost. It's closer to fifty five. That's the very first idea from session zero, arriving with a bill attached.
+
+Where do the tokens actually go? Usually tool results, not the conversation. What's the biggest saving available? Usually caching a stable system prompt. And you can route by difficulty — a cheap model for classification and routing, an expensive one for the step that's genuinely hard.
+
+Then the one that matters most: set a hard spend cap before you need one. Runaway loops are the classic way people discover they should have had a cap, and discovering it that way is expensive.
+
+Finally, observability. Log every model call: the prompt, the response, the tools called, the tokens, the latency, the cost. You cannot debug an agent from its final answer. You need the trace. Then decide your alerting conditions — turn limit hit, tool error rate, cost per request, and the eval score on a nightly run.
+
+And then the practice that almost nobody has yet: run the eval suite automatically against every prompt change, the same way you'd run unit tests against every code change. That is a genuine differentiator, and it's the direct bridge into scoping your own project.
+
+One sentence for the board. If you can't measure it, you're not improving it. You're just changing it.
+
+And the sentence to have ready for an interview: "I built the agent. Then I built the eval suite. The second one is why I know the first one works."
+
+That's Lab Eight.

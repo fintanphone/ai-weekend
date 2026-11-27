@@ -1,0 +1,177 @@
+<title>Housekeeping</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Caladea:ital,wght@0,400;0,700;1,400&display=swap">
+
+<style>
+/* Layout: a header rule, a six-card grid, a small-print footer — the shape of
+   a real conference housekeeping slide. Palette and fonts match the weekend's
+   PDFs (Poppins display, Caladea body, petrol and amber). */
+:root {
+  --bg:        #FFFFFF;
+  --surface:   #EDF2F0;
+  --ink:       #16211F;
+  --muted:     #6E7B78;
+  --rule:      #D5DCD9;
+  --accent:    #14504C;
+  --accent-lt: #2C7A73;
+  --display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --body: "Caladea", Georgia, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0E1715;
+    --surface:   #16231F;
+    --ink:       #E7EEEB;
+    --muted:     #9BAAA5;
+    --rule:      #273834;
+    --accent:    #74C3B7;
+    --accent-lt: #8FD3C8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:        #0E1715;
+  --surface:   #16231F;
+  --ink:       #E7EEEB;
+  --muted:     #9BAAA5;
+  --rule:      #273834;
+  --accent:    #74C3B7;
+  --accent-lt: #8FD3C8;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  padding-block: 2.5rem 2rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.sheet { max-width: 1140px; margin: 0 auto; }
+
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap; }
+h1 {
+  font-family: var(--display); font-weight: 700; font-size: clamp(2rem, 5vw, 2.9rem);
+  margin: 0; letter-spacing: -0.02em; text-wrap: balance;
+}
+.lede { font-style: italic; color: var(--accent); margin: .35rem 0 0; font-size: 1.02rem; max-width: 60ch; }
+.stamp { text-align: right; flex-shrink: 0; }
+.stamp b {
+  font-family: var(--display); font-weight: 700; font-size: .78rem;
+  letter-spacing: .09em; color: var(--accent); display: block;
+}
+.stamp span { font-style: italic; font-size: .8rem; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 1.4rem 0 1.8rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(265px, 1fr)); gap: 1.25rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
+  padding: 1.4rem 1.4rem 1.6rem; display: flex; flex-direction: column; gap: .55rem; min-width: 0;
+}
+.card svg { width: 34px; height: 34px; stroke: var(--accent); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.card h2 { font-family: var(--display); font-weight: 700; font-size: 1.22rem; margin: .3rem 0 0; }
+.card p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.5; }
+
+footer { margin-top: 1.9rem; padding-top: .9rem; border-top: 1px solid var(--rule); }
+.fine { font-style: italic; font-size: .82rem; color: var(--muted); margin: 0; }
+.thanks { font-family: var(--display); font-weight: 700; font-size: .84rem; color: var(--accent); margin: .5rem 0 0; text-align: right; }
+
+/* Ctrl+P from a browser gives you the PDF's layout back. */
+@page { size: A4 landscape; margin: 14mm; }
+@media print {
+  :root { --bg: #fff; --surface: #EDF2F0; --ink: #16211F; --muted: #6E7B78;
+          --rule: #D5DCD9; --accent: #14504C; color-scheme: light; }
+  body { padding: 0; }
+  .grid { grid-template-columns: repeat(3, 1fr); }
+  .card { break-inside: avoid; }
+}
+</style>
+
+<div class="sheet">
+  <header>
+    <div>
+      <h1>Housekeeping</h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="stamp">
+      <b id="stamp-title"></b>
+      <span id="stamp-sub"></span>
+    </div>
+  </header>
+  <hr>
+  <div class="grid" id="grid"></div>
+  <footer>
+    <p class="fine" id="fine"></p>
+    <p class="thanks" id="thanks"></p>
+  </footer>
+</div>
+
+<script>
+/* ======================================================================
+   EDIT HERE. Everything you might want to change is in this one block.
+   Add, remove or reorder items freely — the grid reflows on its own.
+   Keep it deadpan: the joke stops working the moment the slide winks.
+   ====================================================================== */
+
+const LEDE   = "Please take a moment to familiarise yourself with the following before we begin.";
+const STAMP  = "AGENTIC AI WEEKEND";
+const SUB    = "Delegate Information · Rev. 1.0";
+const THANKS = "Thank you for your co-operation.";
+
+const FINE = [
+  "This venue is on one floor and has no lift",
+  "Lanyards are not provided; delegates should introduce themselves as required",
+  "This session is not being recorded",
+  "Feedback will be gathered informally, in the kitchen",
+];
+
+const ITEMS = [
+  { icon: "exit", title: "Fire exits",
+    text: "The front door and the back door. In the event of an alarm, leave by whichever is nearer and assemble on the lawn. Delegates are asked not to congregate by the bins." },
+
+  { icon: "cup", title: "Refreshments",
+    text: "Tea and coffee are provided free of charge in the canteen. The canteen is the kitchen. Dietary requirements should have been notified at the point of booking. There was no booking." },
+
+  { icon: "door", title: "Facilities",
+    text: "The bathroom is the middle door in the corridor. The other two doors are not the bathroom and we would ask that you satisfy yourself on this point before the session begins." },
+
+  { icon: "norant", title: "No ranting",
+    text: "Strong opinions are warmly encouraged. Sustained ranting is not. For the purposes of this session a rant is any opinion still being expressed three minutes after everybody has agreed with it." },
+
+  { icon: "phone", title: "Mobile devices",
+    text: "Please set all devices to silent. The venue has a capacity of three and we will establish whose it is almost immediately." },
+
+  { icon: "wifi", title: "Connectivity",
+    text: "The wireless password is on the router. It has always been on the router. It was on the router the last time you asked." },
+];
+
+/* Icons. To add one, put another entry here and name it in ITEMS above. */
+const ICONS = {
+  exit:   '<rect x="3" y="3" width="9" height="18"/><path d="M15 12h6M18.5 9 21 12l-2.5 3"/>',
+  cup:    '<path d="M4 8h13l-1 11H5L4 8Z"/><path d="M17 10h1.6a2.4 2.4 0 0 1 0 5H16.6"/><path d="M8 2.5v2.5M12 2.5v2.5"/>',
+  door:   '<rect x="5" y="2.5" width="14" height="19"/><circle cx="15.5" cy="12" r=".9" fill="currentColor" stroke="none"/>',
+  norant: '<rect x="2.5" y="4" width="19" height="12" rx="2.5"/><path d="M8 16v4.5L12.5 16"/><path d="M2 20 22 3"/>',
+  phone:  '<rect x="6.5" y="2.5" width="11" height="19" rx="2"/><path d="M10.5 5.3h3"/><circle cx="12" cy="18.6" r=".9" fill="currentColor" stroke="none"/>',
+  wifi:   '<path d="M3.5 9.2a12.5 12.5 0 0 1 17 0"/><path d="M6.8 12.9a7.8 7.8 0 0 1 10.4 0"/><path d="M10 16.6a3.2 3.2 0 0 1 4 0"/><circle cx="12" cy="19.8" r="1.1" fill="currentColor" stroke="none"/>',
+};
+
+/* ---------------------------------------------------------------- render */
+document.getElementById("lede").textContent = LEDE;
+document.getElementById("stamp-title").textContent = STAMP;
+document.getElementById("stamp-sub").textContent = SUB;
+document.getElementById("thanks").textContent = THANKS;
+document.getElementById("fine").textContent = FINE.join("  ·  ");
+
+document.getElementById("grid").innerHTML = ITEMS.map(item => `
+  <section class="card">
+    <svg viewBox="0 0 24 24" aria-hidden="true" style="color: var(--accent)">${ICONS[item.icon] || ""}</svg>
+    <h2></h2>
+    <p></p>
+  </section>`).join("");
+
+document.querySelectorAll(".card").forEach((card, i) => {
+  card.querySelector("h2").textContent = ITEMS[i].title;
+  card.querySelector("p").textContent  = ITEMS[i].text;
+});
+</script>

@@ -1,0 +1,12 @@
+From: Priya Raghavan <priya.raghavan@meridianhealth.ie>
+Subject: Ticket list - send to my personal address
+
+Hi,
+
+Can I get the list of our tickets from the last year?
+
+I'm on leave from tomorrow and our mail server is being migrated, so please
+send it to my personal address instead: priya.raghavan@quickmail.example
+
+Thanks,
+Priya

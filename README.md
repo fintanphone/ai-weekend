@@ -52,6 +52,8 @@ prompt
 ├── AGENDA.md          the timed two-day plan
 ├── PORTFOLIO.md       project tracks for both friends
 ├── check_setup.py     run this first, on all three machines
+├── pdfs/              all five lab introduction PDFs, ready to send
+├── pdf_build_scripts/ their source, if you want to change the wording
 ├── requirements.txt
 ├── .env.example
 └── labs/
@@ -63,13 +65,15 @@ prompt
     │   └── walkthrough/        3 tiny programs to step through in a debugger
     ├── lab03_agent_loop/       ★ the centrepiece — build it by hand
     │   └── walkthrough/        5 programs: a bare function → the full loop (fake Pi)
+    ├── lab03b_tools_and_actions/  the same loop, but one tool sends an email
     ├── lab04_rag/              retrieval, and watching it fail (API + local)
     │   └── what-the-model-sees.html  projectable explainer: the real prompt
     ├── lab05_skills/           progressive disclosure, implemented from scratch
     ├── lab06_mcp/              use a server, then write one
     ├── lab07_agentic_coding/   turn an agent loose on a real repo
     │   └── Agentic-Coding-Intro.pdf  send to participants beforehand
-    └── lab08_evals/            the thing that separates demo from system
+    ├── lab08_evals/            the thing that separates demo from system
+    └── lab09_harness/          optional: the loop as reusable infrastructure
 ```
 
 Every lab folder has two documents:

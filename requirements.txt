@@ -7,6 +7,11 @@ requests>=2.31.0
 numpy>=1.26.0
 sentence-transformers>=3.0.0
 
+# Lab 3b (tools that act) — OPTIONAL.
+# The lab runs on SQLite out of the box with nothing installed. Only install
+# this if you want to point it at a real PostgreSQL server via DATABASE_URL.
+# psycopg[binary]>=3.1
+
 # Lab 6 (MCP)
 mcp>=1.2.0
 

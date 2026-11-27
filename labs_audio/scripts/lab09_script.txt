@@ -1,0 +1,65 @@
+Lab Nine. From a loop to a harness.
+
+This one takes the agent loop you built and asks the next question about it. So it only works if that loop is still fresh in your mind, and ideally still on the whiteboard.
+
+Here's the question. That loop worked. You wrote it yourself, you understood every line of it, and it did the job you asked. So: what would you have to add to it before you'd be willing to let it run at two in the morning, while you were asleep, against something that mattered?
+
+The answer is boring. Almost none of it is clever, and almost none of it is about AI at all. That is not a disappointment. That is the entire lesson of the lab, and if you leave thinking the answer was boring, you have understood it correctly.
+
+Now, the session is deliberately arranged backwards, and it's worth knowing that in advance so you don't feel it's dragging.
+
+The harness does not get shown to you first. The first half hour is spent making you want one.
+
+There's a program that takes the original loop, completely unchanged, and runs it four times under conditions you will genuinely meet. It fails four different ways, and each failure earns exactly one thing.
+
+The first run gives you an answer, and no way to check it. Which tools did it call? With what arguments? What came back? What did it cost? You cannot answer any of those, because the information existed for a few milliseconds and was then discarded. That failure earns observability.
+
+The second run meets a badly worded task with no ceiling on it. Watch the running token total, and watch it accelerate rather than grow steadily, because every single turn resends the entire conversation. That's the stateless API arriving with a bill attached again. That failure earns a budget, and it's the one to linger on, because seeing the numbers climb lands it far better than any whiteboard explanation.
+
+The third run meets one transient tool failure, which propagates out of the loop and kills the whole process. Everything the agent had learned is gone, unlogged, and you pay for all of it again. That earns retries.
+
+And the fourth run restarts a production service without anybody asking it to. Nothing in the tool list distinguished a dangerous action from a harmless one. The original loop handled this with a hard coded check for one specific tool name, which works for exactly one tool. That earns a policy.
+
+By the fourth failure you should be mildly irritated. That's the intended emotional state, and it's the same trick as the earlier walkthroughs, working for the same reason.
+
+Now, before anyone opens the harness file, here's a question worth asking the room. You have just seen four failures. You have all solved every one of them before, in a completely different context. So what are they actually called?
+
+The answers are audit logging. Quotas and rate limiting. Retries with backoff. And authorisation. That is the entire harness, named correctly by people who have never built one. Anyone with an operations or cloud background has been solving these exact four problems for years, and that experience transfers into this field almost completely intact. That's probably the single most useful thing to notice in the whole session.
+
+Then you read the harness itself. About a hundred and eighty lines, five small classes, and nothing clever anywhere in it.
+
+A registry, which keeps the schema and the implementation in one place, so the model can never be offered a tool with no function behind it. A policy, which decides what's allowed to run. A budget. A result object that records what happened. And the loop, with the other four wrapped around it.
+
+Two details are worth stopping on properly.
+
+The budget is checked before each call, not after. That sounds like a small implementation detail and it isn't. Checking afterwards tells you what you already spent — that's a receipt. Checking before is a cap. Those are completely different objects and people conflate them constantly.
+
+And the policy is data, not an if statement. The original loop had a hard coded check for one tool name buried inside it. So ask what happens when you add a second dangerous tool, and then a second task, and then a second environment. A policy you can print, diff in a code review, and load differently per environment is a fundamentally different kind of thing from a condition buried in a loop.
+
+Then two demonstrations, and they're the ones that produce a visible change in behaviour.
+
+The first runs the task with tools failing nearly half the time. The run that died completely in the first half now finishes. Nothing was made smarter. A retry was all it ever needed.
+
+The second refuses the destructive tool and watches what the agent does about it. And what it does is instructive: it receives the refusal as an ordinary tool result, reports that it could not finish the task, and stops. It doesn't crash, and it doesn't find a way round. There is no way round. The registry is the only door into your code.
+
+Then the part that proves this is infrastructure rather than tidier code. There's a third program doing a completely different job — reading data files and writing a report — with completely different tools. Run it first, then read it, and count the lines of loop code in that file.
+
+There are none. No message list, no checking for tool calls, no parsing, no turn limit, no retries. You wrote a registry, a system prompt, and a policy, and that was all. The harness had never heard of those data files and did not need to.
+
+That's the actual test of whether you've built infrastructure. Not "is my code tidy". It's: can somebody solve a problem you never thought about, without opening your file?
+
+And then the discussion, which is the real takeaway and is worth protecting. Fifteen minutes, laptops closed.
+
+When would you not bother with any of this?
+
+Push on that until someone says it plainly: for a script you run once, while watching it, on free local inference, where the worst outcome is a wrong answer you spot immediately, the original twenty line loop is genuinely the right amount of code. Wrapping it in all this would be ceremony. Agree with that loudly, because anyone who thinks more infrastructure is always better has learned the wrong lesson here.
+
+Then draw the threshold. You need a harness the moment any one of these becomes true. It runs unattended. It runs more than once. Somebody else runs it. It costs real money. It can do something you would regret. Or you need to explain afterwards what it did.
+
+And finish with the two ways people get this wrong, because they look like opposites and they're equally common. Some people build the harness first, producing elaborate infrastructure around a problem they have not yet understood. Others build it after a three in the morning incident, which is the expensive way to discover you needed a spend cap.
+
+The honest heuristic is: write the twenty line loop first, every time. Then reach for this at the second task, or at the first unattended run, whichever arrives first.
+
+One sentence for the board. A loop solves your problem. A harness solves the next one too.
+
+That's Lab Nine.

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — structured.py</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    color:#e5e7eb;
+    background:radial-gradient(ellipse at top,#111827,#020617);
+  }
+  .container{
+    max-width:1200px;
+    margin:0 auto;
+    padding:24px 24px 60px;
+  }
+  h1{
+    font-size:1.5rem;
+    color:#f9fafb;
+    margin-bottom:2px;
+    letter-spacing:.2px;
+  }
+  .subtitle{
+    font-size:.875rem;
+    color:#6b7280;
+    margin-bottom:18px;
+  }
+
+  /* scroll wrapper */
+  .table-wrap{
+    width:100%;
+    overflow-x:auto;
+    border-radius:8px;
+    scrollbar-width:thin;
+    scrollbar-color:#1f2937 #0b1220;
+  }
+  .table-wrap::-webkit-scrollbar{height:6px}
+  .table-wrap::-webkit-scrollbar-track{background:#0b1220;border-radius:4px}
+  .table-wrap::-webkit-scrollbar-thumb{background:#1f2937;border-radius:4px}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.85rem;
+    line-height:1.55;
+  }
+
+  thead{position:sticky;top:0;z-index:2}
+  th,td{padding:7px 9px;border-bottom:1px solid rgba(148,163,253,.09);vertical-align:top;text-align:left}
+  thead th{
+    color:#38bdf8;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    font-size:.67rem;
+    padding-bottom:4px;
+  }
+
+  /* widths */
+  td:first-child,th:first-child{width:46%}
+  td:last-child,th:last-child {width:54%;padding-left:12px}
+
+  tbody tr:nth-child(odd) td{background-color:rgba(15,23,42,.88)}
+  tbody tr:hover td{background-color:rgba(56,189,248,.04);transition:background-color .16s ease-out}
+
+  /* code cell */
+  td:first-child{font-size:.76rem;white-space:pre-wrap;word-break:break-all}
+  td:first-child pre{
+    margin:0;
+    padding:5px 7px;
+    border-radius:4px;
+    background:#020817;
+    font-family:SF Mono,Menlo,Consolas,"Fira Code",monospace;
+    color:#e5e7eb;
+    overflow-x:auto;
+    line-height:1.46;
+  }
+
+  /* explanation cell */
+  td:last-child{color:#9ca3af}
+</style>
+</head>
+<body>
+<main class="container">
+  <h1>Code Walkthrough — structured.py</h1>
+  <p class="subtitle">Compares prompt-only vs tool-schema approaches for extracting structured data from support tickets.</p>
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Explanation</th></tr>
+      </thead>
+      <tbody>
+        <!-- shebang + docstring -->
+        <tr>
+          <td><pre>#!/usr/bin/env python3
+"""Lab 2 — turning a model into a software component.
+
+Two ways to get structured data out of an API model, compared head to head:
+
+  A. Ask nicely in the prompt, then parse.       (fragile)
+  B. Define a schema and force a tool call.      (reliable)
+
+    python structured.py                 # both, 3 trials each
+    python structured.py --tier 2        # only the ambiguous tickets
+    python structured.py --trials 10     # sharper contrast
+    python structured.py --misses        # show which trap caught it
+
+Tickets, schema and scoring live in tickets.py, shared with
+structured_local.py so the API and local numbers are directly comparable.
+"""</pre></td>
+          <td>
+- Shebang: enables direct execution from terminal.  
+- Docstring explains the experiment: comparing two extraction methods across randomized trials.  
+- Lists CLI usage variants; documents that shared test cases live in tickets.py for consistency with a local-run companion script.
+          </td>
+        </tr>
+
+        <!-- imports -->
+        <tr>
+          <td><pre>import argparse
+import json
+import os
+
+import anthropic
+from dotenv import load_dotenv
+
+import tickets as T</pre></td>
+          <td>
+- argparse: parse CLI flags.  
+- json: serialize/deserialize model output.  
+- os: read environment variables (model name, keys).  
+- anthropic: official Anthropic SDK for Claude.  
+- dotenv: load .env with secrets; keeps them out of code.  
+- tickets as T: shared module with test cases, schema, validation helpers, and prompt templates.
+          </td>
+        </tr>
+
+        <!-- env + client setup -->
+        <tr>
+          <td><pre>load_dotenv()
+
+MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
+client = anthropic.Anthropic()</pre></td>
+          <td>
+- load_dotenv: loads secrets (API key) from .env into environment.  
+- MODEL: configurable model choice; defaults to claude-sonnet-5 for workshop consistency.  
+- Create Anthropic client once, reused by both methods.
+          </td>
+        </tr>
+
+        <!-- tool definition -->
+        <tr>
+          <td><pre>TOOL = {
+    "name": "record_ticket",
+    "description": "Record a parsed support ticket in the tracking system.",
+    "input_schema": T.SCHEMA,
+}</pre></td>
+          <td>
+- Defines the tool used by Method B.  
+- input_schema (from tickets.py) specifies required fields and types for each ticket record; Claude’s output must match this shape or the API rejects it as invalid arguments.
+          </td>
+        </tr>
+
+        <!-- method A header -->
+        <tr>
+          <td><pre># --------------------------------------------------------------------------
+# Method A — ask in the prompt
+# --------------------------------------------------------------------------</pre></td>
+          <td>
+- Marker comment; introduces “prompt-only” approach.
+          </td>
+        </tr>
+
+        <!-- method_a body -->
+        <tr>
+          <td><pre>def method_a(text: str):
+    resp = client.messages.create(
+        model=MODEL, max_tokens=600,
+        messages=[{"role": "user",
+                   "content": T.PROMPT_A.format(rules=T.RULES, ticket=text)}],
+    )</pre></td>
+          <td>
+- Sends the raw ticket text plus instructions (PROMPT_A) that ask Claude to “format as JSON.”  
+- No structural guarantees—just natural language constraints.
+          </td>
+        </tr>
+
+        <tr>
+          <td><pre>    out = "".join(b.text for b in resp.content if b.type == "text").strip()
+
+    # The defensive cleanup every codebase ends up with. This is the smell.
+    if out.startswith("```"):
+        out = out.split("```")[1].removeprefix("json").strip()</pre></td>
+          <td>
+- Concatenates text blocks and trims whitespace.  
+- Then defensively strips markdown fences (```` ``` ... ````) and possible “json” tag—classic brittle cleanup that appears whenever you rely on prompt-only formatting.
+          </td>
+        </tr>
+
+        <tr>
+          <td><pre>    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return None</pre></td>
+          <td>
+- Attempts JSON parse of cleaned output.  
+- On failure, returns None instead of crashing—so failures become measurable “invalid” results rather than hard errors.
+          </td>
+        </tr>
+
+        <!-- method B header -->
+        <tr>
+          <td><pre># --------------------------------------------------------------------------
+# Method B — declare a tool, force the call
+# --------------------------------------------------------------------------</pre></td>
+          <td>
+- Marker comment for schema-driven approach.
+          </td>
+        </tr>
+
+        <!-- method_b body -->
+        <tr>
+          <td><pre>def method_b(text: str):
+    resp = client.messages.create(
+        model=MODEL, max_tokens=600, tools=[TOOL],
+        # The whole trick: the model MUST call this tool, and the API validates
+        # its arguments against the schema before you ever see them.
+        tool_choice={"type": "tool", "name": "record_ticket"},
+        messages=[{"role": "user",
+                   "content": f"{T.RULES}\n\nParse this support ticket:\n\n{text}"}],
+    )</pre></td>
+          <td>
+- Supplies the TOOL definition and forces its use via tool_choice.  
+- Because of tool_choice, Claude is required to produce a call(record_ticket) with arguments conforming to SCHEMA; otherwise the API rejects it at transport time.  
+- The prompt itself can be minimal since structure enforcement happens at the schema layer.
+          </td>
+        </tr>
+
+        <tr>
+          <td><pre>    for block in resp.content:
+        if block.type == "tool_use":
+            return block.input
+    return None</pre></td>
+          <td>
+- Iterates response blocks; when a tool_use block appears, its input is already validated against the schema and returned as a structured dict.  
+- If no tool_use occurs, returns None (treated as invalid attempt).
+          </td>
+        </tr>
+
+        <!-- METHODS list -->
+        <tr>
+          <td><pre>METHODS = [("A: prompt-based", method_a), ("B: tool schema", method_b)]</pre></td>
+          <td>
+- Centralized list of (label, callable) so the runner can treat both approaches uniformly.
+          </td>
+        </tr>
+
+        <!-- run signature + setup -->
+        <tr>
+          <td><pre>def run(trials: int, tier: str, misses: bool) -> None:
+    cases = T.select(tier)
+    tiers = sorted({c["tier"] for c in cases})
+    print(f"\n  model {MODEL}   tickets {len(cases)} (tier {tier})   trials {trials}\n")</pre></td>
+          <td>
+- run: core experiment harness.  
+- T.select(tier): loads test tickets by difficulty tier (“1”, “2”, or all).  
+- Prints header with model, ticket count, and trial budget so logs are self-contained.
+          </td>
+        </tr>
+
+        <!-- print table header -->
+        <tr>
+          <td><pre>    header = f"  {'method':<18} {'valid':>13} {'fields right':>14}"
+    for ti in tiers:
+        header += f" {'tier ' + str(ti):>9}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))</pre></td>
+          <td>
+- Constructs a columnar header:  
+  - “valid”: how many attempts yielded parseable/valid output.  
+  - “fields right”: accuracy of individual fields vs ground truth.  
+  - Per-tier columns to see where each method struggles most.
+          </td>
+        </tr>
+
+        <!-- per-method loop start -->
+        <tr>
+          <td><pre>    all_misses = []
+    for name, fn in METHODS:
+        valid = attempts = got = possible = 0
+        per_tier = {ti: [0, 0] for ti in tiers}</pre></td>
+          <td>
+- Initializes counters and per-tier tracking arrays:  
+  - valid/ attempts → structural validity rate.  
+  - got/possible → correct field count vs total fields attempted.  
+  - all_misses collects specifics of failures when --misses is requested.
+          </td>
+        </tr>
+
+        <!-- inner loop over cases -->
+        <tr>
+          <td><pre>        for case in cases:
+            for _ in range(trials):
+                attempts += 1
+                try:
+                    result = fn(case["text"])
+                except Exception as exc:  # noqa: BLE001
+                    all_misses.append((name, case["id"], type(exc).__name__))
+                    continue</pre></td>
+          <td>
+- For each ticket and for each trial:  
+  - Calls the method (fn) on that ticket text.  
+  - On unexpected exception (network blip, etc.), logs it and continues instead of aborting—keeps experiment robust to transient errors.
+          </td>
+        </tr>
+
+        <!-- scoring block -->
+        <tr>
+          <td><pre>                if T.is_valid(result):
+                    valid += 1
+                s, total, wrong = T.accuracy(result, case["expect"])
+                got += s
+                possible += total
+                per_tier[case["tier"]][0] += s
+                per_tier[case["tier"]][1] += total
+                for w in wrong:
+                    all_misses.append((name, case["id"], w))</pre></td>
+          <td>
+- T.is_valid(result): checks whether the returned structure is acceptable (not None, has required fields).  
+- T.accuracy(...): compares result to ground-truth expect, returning:  
+  - s = score (correct field count)  
+  - total = fields evaluated  
+  - wrong = list of failure reasons/traps.  
+- Tallies both overall and per-tier; tracks each specific miss for later diagnostics when --misses is used.
+          </td>
+        </tr>
+
+        <!-- printing stats row -->
+        <tr>
+          <td><pre>        vpct = 100 * valid / attempts if attempts else 0
+        apct = 100 * got / possible if possible else 0
+        row = f"  {name:<18} {valid}/{attempts} ({vpct:>3.0f}%)".ljust(34)
+        row += f"{got}/{possible} ({apct:>3.0f}%)".rjust(14)
+        for ti in tiers:
+            g, p = per_tier[ti]
+            row += f" {(100 * g / p if p else 0):>8.0f}%"
+        print(row)</pre></td>
+          <td>
+- Computes and prints one summary row per method:  
+  - Validity rate (vpct) shows structural reliability.  
+  - Field accuracy (apct) shows correctness of content.  
+  - Per-tier columns highlight how difficulty affects each approach.  
+- This is where you see Method B’s advantage clearly in practice.
+          </td>
+        </tr>
+
+        <!-- misses reporting -->
+        <tr>
+          <td><pre>    if misses and all_misses:
+        print("\n  \033[93mwhat went wrong\033[0m")
+        seen = {}
+        for method, cid, what in all_misses:
+            seen.setdefault((method, cid), []).append(what)
+        for (method, cid), whats in sorted(seen.items()):
+            case = next(c for c in cases if c["id"] == cid)
+            print(f"    {method:<18} {cid:<20} {max(set(whats), key=whats.count)}")
+            print(f"    {'':<18} \033[90mtrap: {case['traps']}\033[0m")</pre></td>
+          <td>
+- If --misses is set, prints a compact diagnostic of recurring issues.  
+- Groups by (method, case), picks the most common failure mode for that pair, and annotates which “trap” in the ticket caused it—useful when teaching or tuning prompts.
+          </td>
+        </tr>
+
+        <!-- final commentary -->
+        <tr>
+          <td><pre>    print("""
+  Method B cannot produce a malformed record — the API validates arguments
+  against the schema first. It can still produce a WRONG one. Compare the
+  tier 2 column against tier 1 to see the difference, then run
+  structured_local.py and compare against your own GPU.
+""")</pre></td>
+          <td>
+- Prints key takeaway:  
+  - Method B guarantees well-formed output (schema-enforced), though not guaranteed correctness of content on hard cases.  
+  - Encourages comparing tiers to see where each method degrades, and invites running structured_local.py for local vs cloud model comparisons.
+          </td>
+        </tr>
+
+        <!-- entry point + argparse -->
+        <tr>
+          <td><pre>if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--trials", type=int, default=3)
+    ap.add_argument("--tier", default="all", choices=["1", "2", "all"])
+    ap.add_argument("--misses", action="store_true")
+    args = ap.parse_args()
+    run(args.trials, args.tier, args.misses)</pre></td>
+          <td>
+- CLI entrypoint wiring:  
+  - --trials N: number of independent attempts per ticket (more trials → sharper stats).  
+  - --tier {1,2,all}: filter test cases by difficulty.  
+  - --misses: enable detailed failure diagnostics.  
+- Delegates to run with parsed arguments; keeps experiment logic separate from wiring.
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

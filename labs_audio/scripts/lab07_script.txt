@@ -1,0 +1,65 @@
+Lab Seven. Agentic coding on a real repository.
+
+Of everything we cover, this is the one you are most likely to use on Monday morning. It is also the best argument that exists for the lab that follows it, and you'll see why by the end.
+
+The setup is small and deliberately nasty. There's a repository containing a freight billing calculator. About eighty lines of code, no tests at all, and an author who has left the company. There's a README that states the business rules clearly.
+
+And the README and the code disagree with each other.
+
+That's the whole exercise. There are several bugs planted in there, of deliberately different kinds, and part of the point is that some of them are far easier for an agent to find than others. Nobody is going to tell you how many.
+
+Now, the first step, and please do not skip it, because the whole session degrades if you do.
+
+Spend ten minutes reading it yourself. No agent. Read the README, read both code files, and each of you write down privately what you think is wrong before anybody runs anything.
+
+Two reasons. The first is that it gives you a baseline to compare the agent against, and without that comparison you learn almost nothing about where the agent is strong. The second is that it stops the session becoming passive. Watching an agent work is pleasant and teaches you very little. Having a prediction that gets confirmed or broken teaches you a lot.
+
+Then let it explore. Point a coding agent at the directory and ask it to read the README and the code and tell you where they disagree.
+
+Watch how it works rather than just reading the conclusion. It reads a file, builds a picture, goes back for another, cross references them. Don't interrupt it. Then compare its list against yours, in both directions, because the differences in both directions are the interesting part.
+
+Now the step that matters most in this entire lab.
+
+Finding a bug by reading is a claim. It is the model asserting that something is wrong. So make it produce evidence. Ask it to write a test that fails because of a specific bug, and then to show you that test failing.
+
+The distinction between "the model told me there's a bug" and "there is a red test on my screen" is the entire difference between agentic coding being useful and being a liability. Insist on the second one. Always. Every single time. If you take one habit away from this lab, take that one.
+
+Then ask it to fix the bug and show you the test passing, and to change nothing else. Then ask it to write tests covering the other rules in the README, and tell you which of those fail.
+
+Notice what you've just built, almost as a side effect. A repository that had no tests at all now has a test suite, written by something that had to read the business rules to produce it. That's often the single most valuable thing an agent does for an old codebase.
+
+Then push it somewhere it will struggle, because knowing where the edge is matters more than knowing it works.
+
+Ask it to refactor the whole thing so the rules are data driven and configurable per customer. Ask it to add multi currency support with historical exchange rates. Ask it whether the code is thread safe and what would break under concurrency.
+
+Watch it get progressively less reliable as the tasks get broader. And here is the specific trap, because this is where people actually get burned in real life. The refactor will look clean. The code will read well. The structure will genuinely be better.
+
+So check whether the behaviour is actually identical. Because the diff reads beautifully, and the tests that would have caught the difference are tests you never wrote, and a subtle behaviour change ships to production looking like a tidy-up commit.
+
+Then undo all of it. One command, throw away every change. That is a non negotiable habit, not a suggestion: work on a branch, commit before you let an agent loose, and be genuinely willing to throw the entire thing away. Agent work is cheap to redo and expensive to half review.
+
+A few habits worth stating plainly, because they're the difference between this being a superpower and a slow-motion accident.
+
+Always on a branch, always committed first, so that throwing it away costs you nothing.
+
+Ask for a failing test before a fix. Every time.
+
+Small scoped tasks beat large vague ones. "Fix the discount boundary" works. "Clean up the billing code" does not.
+
+Read the diff. All of it. And if the diff is too big to read, that's not a reading problem, that's a signal that the task you asked for was too big.
+
+And give it the ability to actually run things. An agent that can execute the test suite is dramatically more useful than one that can only read files, because it can check its own work instead of asserting.
+
+Then the discussion, and there are two questions that are genuinely worth the time.
+
+The first: which bugs did the agent find that you didn't, and which did you find that it didn't? Look for the pattern rather than the score. There usually is one.
+
+The second: at this scale, it is a much better reader than it is a writer. Why might that be, and what does that imply about how you should be using it day to day? That question has a real answer and it changes how people work.
+
+And one more, which is less comfortable: what review process would you need before letting this anywhere near production code, and who is accountable for a bug that an agent introduced and a human approved?
+
+If you're entering a job market, here's the practical note. This is the fastest way that currently exists to become productive in an unfamiliar codebase. Point it at a real open source project tonight, one you've never seen, and ask it to explain the architecture. That skill is directly relevant to your first month anywhere.
+
+One sentence for the board. Agentic coding is excellent at reading, good at narrow changes, and dangerous at broad ones. The whole skill is knowing which one of those you just asked for.
+
+That's Lab Seven.

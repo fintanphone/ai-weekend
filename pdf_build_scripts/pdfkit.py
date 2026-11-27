@@ -273,21 +273,29 @@ def content_page(c, doc):
     c.setStrokeColor(RULE)
     c.setLineWidth(0.7)
     c.line(ML, PAGE_H - MT + 6 * mm, PAGE_W - MR, PAGE_H - MT + 6 * mm)
-    c.setFont("Display-Light", 7.4)
-    c.setFillColor(SLATE)
-    c.drawString(ML, PAGE_H - MT + 8.5 * mm, RUNNING["head"])
     c.restoreState()
 
 
 def content_page_end(c, doc):
+    """Head and folio are drawn at page END, not page start.
+
+    A document whose running head changes per section sets it from a flowable
+    in the story. Those flowables have not been drawn yet when onPage fires, so
+    drawing the head there renders the PREVIOUS section's head on every page.
+    By page end the flowables have run and RUNNING holds the right value.
+    """
     c.saveState()
-    c.setFont("Mono", 8)
+    c.setFont("Display-Light", 7.4)
     c.setFillColor(SLATE)
+    c.drawString(ML, PAGE_H - MT + 8.5 * mm, RUNNING["head"])
+    if RUNNING.get("section"):
+        c.drawRightString(PAGE_W - MR, PAGE_H - MT + 8.5 * mm, RUNNING["section"])
+    c.setFont("Mono", 8)
     c.drawRightString(PAGE_W - MR, MB - 9 * mm, str(doc.page))
     c.restoreState()
 
 
-RUNNING = {"head": ""}
+RUNNING = {"head": "", "section": ""}
 
 
 def make_doc(out_path, title, cover_spec, running_head):

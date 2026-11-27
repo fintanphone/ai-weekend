@@ -1,0 +1,51 @@
+Lab Four. RAG, and watching it fail.
+
+RAG stands for retrieval augmented generation, and the idea is simple enough to state in a sentence: before you ask the model a question, go and find the relevant documents, and put them in the prompt alongside the question.
+
+That's the whole concept. You could implement a working version in twenty minutes. So this lab spends very little time making it work, and most of its time breaking it, because that's where the value is.
+
+Here's the uncomfortable idea at the centre of it. RAG is a search problem wearing an AI costume.
+
+Most production failures in these systems are search failures. Bad chunking, bad ranking, or a question that the shape of your index simply cannot answer. And the standard response, when the answers come back wrong, is to change the model. Which does nothing at all, because the model never saw the right text in the first place.
+
+There is no vector database in this lab, and that's deliberate. A vector database is an index plus a network hop. The actual retrieval here is a couple of lines of array arithmetic — multiply, then sort, then take the top three. That's it. Everything else in the surrounding tooling ecosystem is operational convenience wrapped around those two lines, and hiding them behind a service makes the whole thing look more sophisticated than it is.
+
+Before you start, open the visualiser page in a browser. It needs nothing installed. It shows you the literal prompt this lab assembles, colour coded by where each piece came from, next to the reply that comes back. Look at that first, because once you've seen the prompt there's nothing mysterious left about how any of this works.
+
+Then read the corpus. Five short policy documents for a fictional freight company. Actually read them, because you need to know what's in them to judge whether the answers you get are right. That's not busywork — it's the only way to evaluate the system.
+
+The code has four stages in order: chunk, embed, retrieve, generate. Chunk the documents into paragraphs. Turn each one into a vector. When a question arrives, turn it into a vector too, find the closest chunks, and hand them to the model with the question.
+
+Make it work first. Ask about annual leave. Ask whether you can claim for a hotel dinner. Ask what happens if you submit an expense late. These work well, and the retrieval scores show the right chunk sitting clearly at the top. Enjoy that briefly, because it's about to stop.
+
+Now break it. Three questions, three completely different failure modes, and each one is a shape you'll meet again in real systems.
+
+The first is multi hop. Ask what notice period a warehouse supervisor has to give. The answer needs two facts from two different documents. One document says a supervisor is a senior associate grade. A different document says anyone below manager grade gives one month. No single chunk contains both facts, and neither chunk scores particularly well against the combined question. So the system retrieves text that looks plausible, and answers wrongly, or hedges.
+
+The second is negation. Ask which roles cannot work remotely. The answer lives in an exclusion clause, and embeddings are notoriously bad at negation. "Can work remotely" and "cannot work remotely" sit almost on top of each other in vector space, because they are about the same topic. The vector captures what the sentence is about. It barely captures whether the sentence is affirming or denying.
+
+The third is aggregation. Ask how many of the policies mention a monetary limit. Retrieving the top three chunks structurally cannot answer a question about the whole corpus. It will never see all five documents. And raising the number of chunks doesn't fix that class of problem — it just moves the threshold a bit further out.
+
+Then spend twenty minutes trying to fix them, in pairs, because the attempts teach more than the fixes.
+
+Raise the number of retrieved chunks to ten. Something improves. Something else gets worse. Watch the token count while you do it. Raising that number is the first thing everybody tries when RAG gives a bad answer, and what it actually does is treat a precision problem by paying for recall.
+
+Change the chunking to use whole documents instead of paragraphs. Notice which questions get better and which get worse. There is no setting that wins everywhere, and discovering that for yourself is the point.
+
+Then try this. Ask what grade a warehouse supervisor is. Take that answer, and use it to build a second query. You have just reinvented agentic RAG — retrieval as a tool inside a loop, rather than a fixed pipeline stage. Say that out loud when it happens, because it's the direct connection back to the agent loop you built earlier.
+
+If you're running the local version, there are a few experiments worth your time, and one of them is the most important thing in the lab.
+
+Run a question with retrieval switched off entirely. No chunks, no grounding instruction, just the question. You get a fluent, confident, completely invented answer about a company that does not exist. Run that next to the normal version and the contrast makes the point better than any explanation could. The model never knew any of this. Not one word of it. Everything correct it ever says about this company came from retrieval.
+
+Then look at where the time actually goes. The run prints a breakdown of retrieval versus generation, and the split surprises people. Retrieval is the part everyone frets about optimising. It is not the part taking the time.
+
+And finally, the experiment almost nobody runs. Ask it four questions the corpus genuinely cannot answer, with a prompt that explicitly tells it to say when it doesn't know. Retrieval still returns three chunks for every one of them, because retrieval always returns three chunks. They look relevant and they contain nothing useful.
+
+The subtle one is asking how much the annual bonus is worth. The grades document mentions bonus eligibility, but never states an amount. So a highly relevant chunk comes back that does not answer the question. That's the hard case, and it's the one that catches smaller models out.
+
+This is the most important property of a retrieval system, and almost nobody measures it. A system that answers ninety five per cent of questions well and invents the other five per cent without flagging them is worse than useless. Not because of the five per cent, but because you cannot tell which five per cent.
+
+One sentence for the board. Retrieval decides what the model can know. The model only decides how well it says it. So debug the retrieval first, every time.
+
+That's Lab Four.

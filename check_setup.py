@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 OK, WARN, FAIL = "\033[92m  OK  \033[0m", "\033[93m WARN \033[0m", "\033[91m FAIL \033[0m"
 results = []
@@ -64,7 +65,7 @@ def check_api_key():
         import anthropic
 
         client = anthropic.Anthropic()
-        model = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
+        model = os.environ.get("WORKSHOP_MODEL", "claude-haiku-5-5")
         client.messages.create(
             model=model,
             max_tokens=8,
@@ -88,23 +89,34 @@ def check_binary(name, args, label, required=True):
         report(WARN, label, "installed but did not respond")
 
 
-def check_ollama_models():
-    if shutil.which("ollama") is None:
-        return
+def check_local_server():
+    """Either llama.cpp or Ollama is fine — the labs detect whichever is up."""
+    sys.path.insert(0, str(Path(__file__).parent / "labs" / "common"))
     try:
-        out = subprocess.run(
-            ["ollama", "list"], capture_output=True, text=True, timeout=20
-        ).stdout
-    except Exception:  # noqa: BLE001
-        report(WARN, "ollama models", "could not list — is `ollama serve` running?")
+        from local_backend import connect
+    except ImportError:
+        report(WARN, "local backend", "labs/common/local_backend.py not found")
         return
 
-    for model in ["llama3.2:3b", "qwen3:8b", "qwen3:14b", "nomic-embed-text"]:
-        stem = model.split(":")[0]
-        if stem in out:
-            report(OK, f"ollama model: {model}")
-        else:
-            report(WARN, f"ollama model: {model}", f"ollama pull {model}")
+    try:
+        be = connect(timeout=3)
+    except Exception:  # noqa: BLE001
+        base = os.environ.get("LOCAL_API_BASE", "http://localhost:8080")
+        report(WARN, "local model server",
+               f"nothing at {base} or Ollama — fine on a laptop without a GPU")
+        return
+
+    report(OK, f"local server ({be.kind})", be.model_name)
+
+    try:
+        style = be.probe_schema_support()
+    except Exception:  # noqa: BLE001
+        style = None
+    if style:
+        report(OK, "constrained decoding", f"response_format style: {style}")
+    else:
+        report(WARN, "constrained decoding",
+               "no response_format shape honoured — Lab 2b method B unavailable")
 
 
 def check_gpu():
@@ -135,8 +147,7 @@ def main():
     print()
     check_binary("node", ["--version"], "Node.js")
     check_binary("claude", ["--version"], "Claude Code")
-    check_binary("ollama", ["--version"], "Ollama", required=False)
-    check_ollama_models()
+    check_local_server()
     check_gpu()
 
     fails = results.count(FAIL)

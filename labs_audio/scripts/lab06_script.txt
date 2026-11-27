@@ -1,0 +1,55 @@
+Lab Six. MCP, the Model Context Protocol.
+
+Start from the problem, because the problem is what makes the protocol make sense.
+
+In the agent loop lab, you wrote tools directly into your agent. Three functions, three schemas, sitting in one script. And they worked beautifully, inside that one script, and nowhere else. If you wanted those same three tools in a different application, your only option was to copy the code across and maintain it in two places.
+
+MCP inverts that. A server exposes capabilities. Any client can consume them. You write the tool once, and then your own agent can use it, a coding assistant can use it, a desktop client can use it, and so can somebody else's application that you have never seen.
+
+If you have a background in distributed systems, you will recognise this within about thirty seconds as service discovery and a capability registry, pointed at models instead of microservices. That recognition is correct, and it's worth saying out loud in the room, because the analogy will help anyone coming from the theory side far more than the specification will.
+
+There are three primitives in the protocol. Tools are functions the model can call. Resources are data a client can read into context. Prompts are reusable templates a user can invoke. Tools are roughly ninety per cent of what anyone actually uses, so don't spend much time on the other two.
+
+The lab has two halves, and they're deliberately in this order: first you consume a server somebody else wrote, then you write your own.
+
+The first half takes about twenty five minutes. You register the filesystem server, point it at a directory, and then ask a client questions about those files. Which are the largest, when were they last modified, that sort of thing.
+
+Two things to notice while that happens. The first is that it works, and you wrote none of it. That's the entire value proposition in one observation.
+
+The second is the permission prompt. The client asks you before it runs each tool. That prompt is, in practice, the main security boundary in this whole ecosystem right now. So here's the question to actually argue about: is a human clicking "allow" a sufficient security boundary when there are two hundred tool calls in a session? Be honest about it. We all know what happens to a prompt that appears two hundred times.
+
+Then the second half, which is writing one. It's about sixty lines, and most of that is database queries.
+
+You seed a small local database with ten shipments and ten inventory lines for a fictional freight company. Then you look at the server code, and the thing to notice is how little there is. You write an ordinary function with ordinary type hints and a docstring, and you put a decorator on it. The decorator turns the function signature into a schema and the docstring into the tool description.
+
+Stop there for a second, because this is the same contract you have already met twice. The schema is the structured output lab. The name and arguments the model emits are the agent loop. This is those two ideas wearing a protocol and a standard transport. Nothing new is being asked of you.
+
+Now, the most important conversation in this lab, and the one to protect if you run short of time.
+
+The server exposes four narrow tools. List shipments by status. Get the detail of one shipment. Stock levels by warehouse. Search the inventory. So ask the obvious question: why not just expose a single tool that takes any database query you like, and let the model write its own?
+
+It would be far more flexible. It would be dramatically less code. And it is a genuinely bad idea, because it hands the model the database's full authority. That includes dropping tables. It includes reading every row of every table, regardless of what the question actually needed. You have replaced a permission system with a hope.
+
+So here's the reframing, and it's the sentence the lab exists to deliver. Narrow tools are a permissioning mechanism, not a limitation. You are not writing those four functions because the model needs help. You are writing them because the tool list is the capability grant. That's the idea from the very first session, now operating at protocol scale.
+
+Then register your server and ask it business questions. Which shipments are delayed, and is there a pattern in why. What's the total stock value in a particular warehouse. We need a hundred units of anything strapping related, can we fulfil that from stock.
+
+That last one is the one to watch. It needs a search, then a check of quantities across multiple warehouses, then reasoning about whether the total is enough. Three tool calls, sequenced by the model, with nobody writing that sequence. It's the same moment as the agent loop, except now the tools live in a separate process behind a standard protocol.
+
+Then spend twenty minutes extending it. Add a tool each. Carrier performance, average transit days and delay rate. Low stock below a threshold. A summary per warehouse. Restart the client to pick up the changes, because tool schemas are read when the connection opens.
+
+And then do the experiment that teaches the most. Write a tool with a deliberately useless docstring. Just the words "gets data", and nothing else. Then watch the model fail to use it correctly, or fail to use it at all.
+
+Because here's the thing that experiment proves. The docstring is not documentation. The docstring is the interface. It is the only thing the model has to decide whether your tool is relevant and what to put in the arguments. That is exactly the same lesson as the description line in the skills lab, and noticing that it's the same lesson twice is more valuable than either instance on its own.
+
+Two questions to take into the discussion.
+
+First: what happens if a server returns text that contains instructions? That's the prompt injection problem from the agent loop lab, except now at protocol scale, with somebody else's code sitting in the middle of it. So who is trusting whom, exactly, and on what basis?
+
+Second, and this one is a genuine opportunity rather than a puzzle: how would you run this for a company? Authentication, secrets management, audit logging, multi tenancy, rate limits, versioning. Almost none of that is solved in the ecosystem yet. That gap is a real product gap, which means it is also a very good portfolio project, and there's a file in the repo listing exactly that.
+
+One last thing before the session: think about what in your own work could be an MCP server. Write it down. It's a candidate for the scoping conversation later.
+
+One sentence for the board. A tool is a contract. MCP is that contract with a standard transport, so that it stops belonging to one application.
+
+That's Lab Six.

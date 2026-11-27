@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Code Walkthrough — skill_runner.py</title>
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+        min-height: 100%;
+        background: radial-gradient(ellipse at top, #111827, #020617);
+        color: #e5e7eb;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                     sans-serif;
+    }
+
+    body {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 18px 60px;
+    }
+
+    /* Header */
+
+    header {
+        margin-bottom: 18px;
+    }
+
+    header h1 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #f9fafb;
+        letter-spacing: -0.02em;
+    }
+
+    header p {
+        margin-top: 4px;
+        font-size: 0.88rem;
+        color: #9ca3af;
+    }
+
+    /* Scroll wrapper */
+
+    .table-wrap {
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid rgba(148,163,253,0.12);
+        background: rgba(2,6,23,0.7);
+    }
+
+    /* Scrollbar (thin / dark) */
+
+    .table-wrap::-webkit-scrollbar { height: 6px; width: 6px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb {
+        background: rgba(148,163,253,0.25);
+        border-radius: 999px;
+    }
+
+    /* Table */
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        min-width: 760px;
+    }
+
+    thead {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    thead th {
+        background: #111827f7;
+        padding: 10px 14px;
+        text-align: left;
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #38bdf8;
+        border-bottom: 1px solid rgba(56,189,248,0.25);
+    }
+
+    tbody tr:nth-child(even) {
+        background: rgba(15,23,42,0.45);
+    }
+
+    tbody tr:hover {
+        background: rgba(56,189,248,0.07);
+        transition: background 0.18s ease;
+    }
+
+    td {
+        padding: 7px 14px;
+        vertical-align: top;
+        border-bottom: 1px solid rgba(148,163,253,0.08);
+    }
+
+    /* Code column */
+
+    .col-code {
+        width: 46%;
+        max-width: 46%;
+        white-space: pre-wrap;
+        overflow-x: auto;
+    }
+
+    .col-code code {
+        font-family: "SF Mono", Menlo, Consolas, ui-monospace, monospace;
+        font-size: 0.79rem;
+        line-height: 1.55;
+        color: #e5e7eb;
+        background: #020817;
+        border-radius: 6px;
+        padding: 6px 8px;
+        display: block;
+    }
+
+    /* Explanation column */
+
+    .col-why {
+        width: 54%;
+        color: #9ca3af;
+        font-size: 0.82rem;
+        line-height: 1.6;
+    }
+
+    .col-why strong {
+        color: #e5e7eb;
+    }
+
+    /* Accent helpers */
+
+    a, .accent {
+        color: #38bdf8;
+        text-decoration: none;
+    }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Code Walkthrough — skill_runner.py</h1>
+  <p>Progressive-disclosure agent runner that loads detailed “skill” instructions on demand instead of up front.</p>
+</header>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th class="col-code">Code</th>
+  <th class="col-why">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<!-- Shebang -->
+<tr>
+<td class="col-code"><code>#!/usr/bin/env python3</code></td>
+<td class="col-why">
+Shebang for Unix environments; allows running this script directly (e.g. ./skill_runner.py) with an env-discovered Python 3 interpreter.
+</td>
+</tr>
+
+<!-- Docstring -->
+<tr>
+<td class="col-code"><code>"""Lab 5 — progressive disclosure, implemented from scratch.
+
+The point of this file is to show there is no magic. A skill is a folder with a
+markdown file in it. "Progressive disclosure" is: put the description in the
+system prompt, and give the model a tool that reads the rest.
+
+    python skill_runner.py "profile the shipments file"
+    python skill_runner.py --no-skills "profile the shipments file"   # contrast
+    python skill_runner.py --show-context "..."                       # token accounting
+"""</code></td>
+<td class="col-why">
+Module docstring explains the design idea: skills are Markdown files; only short descriptions live in the system prompt. Full instructions (“the rest”) are loaded via a tool when needed, saving tokens and context. The example invocations show normal mode, no-skills contrast, and token-accounting mode.
+</td>
+</tr>
+
+<!-- Imports -->
+<tr>
+<td class="col-code"><code>import argparse
+import json
+import os
+import re
+from pathlib import Path
+
+import anthropic
+from dotenv import load_dotenv</code></td>
+<td class="col-why">
+Core imports:
+- argparse: CLI parsing.
+- json, os, re: utilities used later for tool output and frontmatter parsing.
+- pathlib.Path: path helpers.
+- anthropic: official Claude client library.
+- dotenv.load_dotenv: load environment variables from .env (e.g. API key).
+</td>
+</tr>
+
+<!-- load_dotenv -->
+<tr>
+<td class="col-code"><code>load_dotenv()</code></td>
+<td class="col-why">
+Loads .env into the process environment at startup, so keys like ANTHROPIC_API_KEY or WORKSHOP_MODEL can be provided without hardcoding.
+</td>
+</tr>
+
+<!-- Config: MODEL -->
+<tr>
+<td class="col-code"><code>MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")</code></td>
+<td class="col-why">
+Configurable model name; defaults to “claude-sonnet-5” unless WORKSHOP_MODEL is set. This centralizes where the model choice lives.
+</td>
+</tr>
+
+<!-- Config: paths -->
+<tr>
+<td class="col-code"><code>HERE = Path(__file__).parent
+SKILLS_DIR = HERE / "skills"
+DATA_DIR = HERE.parent / "lab03_agent_loop" / "workspace"</code></td>
+<td class="col-why">
+Path setup:
+- HERE: directory containing this script.
+- SKILLS_DIR: where skill folders live (each with a SKILL.md).
+- DATA_DIR: workspace root for data files the agent is allowed to read.
+Using Path objects keeps cross-platform behavior safe and composable.
+</td>
+</tr>
+
+<!-- Anthropic client -->
+<tr>
+<td class="col-code"><code>client = anthropic.Anthropic()</code></td>
+<td class="col-why">
+Instantiate the Anthropic SDK client (uses ANTHROPIC_API_KEY from env). Single global client reused across the run; no need to recreate it.
+</td>
+</tr>
+
+<!-- parse_frontmatter -->
+<tr>
+<td class="col-code"><code># --------------------------------------------------------------------------
+# Discovery — read ONLY the frontmatter. This is level 1 of disclosure.
+# --------------------------------------------------------------------------
+
+def parse_frontmatter(text: str) -> tuple[dict, str]:
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", text, re.DOTALL)
+    if not match:
+        return {}, text
+    meta = {}
+    for line in match.group(1).splitlines():
+        if ":" in line:
+            key, _, value = line.partition(":")
+            meta[key.strip()] = value.strip()
+    return meta, match.group(2)</code></td>
+<td class="col-why">
+Extracts YAML-style frontmatter between opening and closing --- fences at the top of a Markdown file.
+
+Key points:
+- Uses a regex that captures everything before/after the second ---.
+- If no valid frontmatter, returns empty dict + original text.
+- Parses each “key: value” line into meta dict; ignores others.
+- Returns (meta_dict, rest_of_file).
+This is “level 1 disclosure”: we read lightweight metadata without loading full instructions yet.
+</td>
+</tr>
+
+<!-- discover_skills -->
+<tr>
+<td class="col-code"><code>def discover_skills() -> dict[str, dict]:
+    skills = {}
+    for path in sorted(SKILLS_DIR.glob("*/SKILL.md")):
+        meta, body = parse_frontmatter(path.read_text())
+        name = meta.get("name", path.parent.name)
+        skills[name] = {
+            "name": name,
+            "description": meta.get("description", ""),
+            "body": body,
+            "path": path,
+        }
+    return skills</code></td>
+<td class="col-why">
+Scans SKILLS_DIR for any folder containing a SKILL.md; parses frontmatter from each. Builds a dict keyed by skill name with:
+- description (short) shown in system prompt
+- body (full instructions, loaded on demand later via tool).
+Sorted glob ensures deterministic ordering across runs.
+</td>
+</tr>
+
+<!-- build_tools -->
+<tr>
+<td class="col-code"><code># --------------------------------------------------------------------------
+# Tools
+# --------------------------------------------------------------------------
+
+def build_tools(skills: dict) -> list[dict]:
+    tools = [
+        {
+            "name": "read_file",
+            "description": "Read a data file from the workspace.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        }
+    ]
+    if skills:
+        tools.append(
+            {
+                "name": "read_skill",
+                "description": (
+                    "Load the full instructions for one of the available skills. "
+                    "Call this before starting work if a skill is relevant."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "enum": sorted(skills)}
+                    },
+                    "required": ["name"],
+                },
+            }
+        )
+    return tools</code></td>
+<td class="col-why">
+Constructs the tool definitions sent to Claude:
+
+- read_file: always present; lets model fetch workspace files.
+- read_skill: added only if skills exist; its enum is set to available skill names so the model can’t invent one. 
+
+This embodies progressive disclosure: the model sees that “read_skill” exists and may call it when relevant, without having all instructions baked in from the start.
+</td>
+</tr>
+
+<!-- tool_read_file -->
+<tr>
+<td class="col-code"><code>def tool_read_file(path: str) -> str:
+    target = (DATA_DIR / path).resolve()
+    if not target.is_relative_to(DATA_DIR.resolve()):
+        return "ERROR: path escapes the workspace."
+    if not target.exists():
+        available = ", ".join(p.name for p in DATA_DIR.glob("*"))
+        return f"ERROR: not found. Available: {available}"
+    return target.read_text(errors="replace")[:8000]</code></td>
+<td class="col-why">
+Implements the read_file tool with safety and guidance:
+- Resolves relative to DATA_DIR only; rejects paths escaping it (defense against ../ tricks).
+- On missing file, lists available items so the model can correct itself.
+- Caps content at 8000 characters to avoid flooding context; uses errors="replace" to handle encoding issues gracefully.
+</td>
+</tr>
+
+<!-- System prompt constants -->
+<tr>
+<td class="col-code"><code># --------------------------------------------------------------------------
+# System prompt — level 1: names and descriptions only
+# --------------------------------------------------------------------------
+
+BASE_SYSTEM = "You are a data analyst assistant with access to a small workspace."
+
+SKILLS_BLOCK = """
+
+## Available skills
+
+You have skills available. Each is a set of detailed instructions you can load
+on demand. Only the name and description are shown here. If a skill is relevant
+to the task, call `read_skill` to load its full instructions BEFORE you start
+work, then follow them exactly.
+
+{listing}
+"""</code></td>
+<td class="col-why">
+System prompt constants define how skills are advertised:
+- BASE_SYSTEM sets role and context.
+- SKILLS_BLOCK explains progressive disclosure to the model in plain English: only summaries shown; call read_skill when relevant, then follow fully.
+
+The {listing} is filled dynamically so that skill metadata appears here without including full bodies.
+</td>
+</tr>
+
+<!-- build_system -->
+<tr>
+<td class="col-code"><code>def build_system(skills: dict) -> str:
+    if not skills:
+        return BASE_SYSTEM
+    listing = "\n".join(
+        f"- **{s['name']}**: {s['description']}" for s in skills.values()
+    )
+    return BASE_SYSTEM + SKILLS_BLOCK.format(listing=listing)</code></td>
+<td class="col-why">
+Builds the final system prompt:
+- If no skills, just use base role description.
+- Otherwise, inject a bullet list of skill names and short descriptions into SKILLS_BLOCK.
+
+This keeps the system prompt lean while still guiding the model on what’s available and when to load more.
+</td>
+</tr>
+
+<!-- run: setup -->
+<tr>
+<td class="col-code"><code># --------------------------------------------------------------------------
+
+def run(task: str, use_skills: bool, show_context: bool, max_turns: int = 8) -> None:
+    skills = discover_skills() if use_skills else {}
+    system = build_system(skills)
+    tools = build_tools(skills)
+    messages = [{"role": "user", "content": task}]</code></td>
+<td class="col-why">
+Core entrypoint of the agent loop:
+
+- If use_skills is True, discover skills; otherwise empty (for contrast experiments).
+- system and tools are derived from discovered skills.
+- Initial messages list starts with one user message carrying the task prompt—this is where conversation begins.
+</td>
+</tr>
+
+<!-- run: show_context -->
+<tr>
+<td class="col-code"><code>    if show_context:
+        full = sum(len(s["body"]) for s in skills.values())
+        print("\n\033[95m--- context accounting ---\033[0m")
+        print(f"skills discovered:        {len(skills)}")
+        print(f"system prompt chars:      {len(system)}")
+        print(f"full skill bodies chars:  {full}   \033[90m(NOT loaded yet)\033[0m")
+        if full:
+            print(f"saved up front:           {100 * full / (full + len(system)):.0f}%")
+        print("\033[95m--------------------------\033[0m")</code></td>
+<td class="col-why">
+Optional debugging/teaching mode (--show-context):
+
+Prints token-accounting stats: how many skills exist, system prompt length, total characters in all skill bodies (which are NOT yet loaded), and approximate % saved by progressive disclosure. Useful to show the benefit of lazy-loading instructions.
+</td>
+</tr>
+
+<!-- run: main loop start -->
+<tr>
+<td class="col-code"><code>    for turn in range(1, max_turns + 1):
+        print(f"\n\033[90m─── turn {turn} ───\033[0m")
+        response = client.messages.create(
+            model=MODEL, max_tokens=3000, system=system, tools=tools, messages=messages
+        )</code></td>
+<td class="col-why">
+Main agent loop: up to max_turns iterations.
+
+Each turn sends:
+- The same system prompt (with skill summaries).
+- Current conversation history in messages.
+- Available tools.
+
+This allows Claude to respond with text or tool_use blocks, which we then execute and feed back—classic ReAct-style flow.
+</td>
+</tr>
+
+<!-- run: print assistant output -->
+<tr>
+<td class="col-code"><code>        for block in response.content:
+            if block.type == "text" and block.text.strip():
+                print(block.text.strip())</code></td>
+<td class="col-why">
+Prints any text content blocks from Claude to the terminal so users see its reasoning, explanations, or intermediate commentary as it runs.
+</td>
+</tr>
+
+<!-- run: no tool_use => done -->
+<tr>
+<td class="col-code"><code>        if response.stop_reason != "tool_use":
+            print(f"\n\033[92m✓ done in {turn} turn(s)\033[0m")
+            return</code></td>
+<td class="col-why">
+If Claude’s stop_reason is not tool_use, it means:
+- Either it finished with text (tool_result or end_turn) and doesn’t need more tools.
+
+We consider the task complete and exit the loop early. This avoids pointless extra calls once Claude is done.
+</td>
+</tr>
+
+<!-- run: collect tool results -->
+<tr>
+<td class="col-code"><code>        messages.append({"role": "assistant", "content": response.content})
+        results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+
+            if block.name == "read_skill":
+                name = block.input["name"]
+                out = skills[name]["body"] if name in skills else f"ERROR: no skill {name!r}"
+                print(f"\033[96m→ read_skill({name})  [+{len(out)} chars into context]\033[0m")
+            else:
+                out = tool_read_file(**block.input)
+                print(f"\033[93m→ {block.name}({json.dumps(block.input)})\033[0m")
+
+            results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
+        messages.append({"role": "user", "content": results})</code></td>
+<td class="col-why">
+Tool execution and feedback loop:
+
+- Append Claude’s assistant response (including tool_use blocks) to conversation history.
+- Iterate over content blocks; for each tool_use:
+  - read_skill: loads the full skill body from skills[name]["body"], injecting it into context now, not earlier. Shows how many chars added for transparency.
+  - Any other tool_use: currently only read_file is expected; calls tool_read_file with block’s input.
+
+- Each result is wrapped as a "tool_result" and sent back in one user message. Claude then continues with that information on the next turn, allowing iterative refinement or further tool calls until done.
+</td>
+</tr>
+
+<!-- run: turn limit -->
+<tr>
+<td class="col-code"><code>    print("\n\033[91mHit turn limit.\033[0m")</code></td>
+<td class="col-why">
+If we exhaust max_turns without Claude indicating completion, we stop and warn. Prevents runaway loops or excessive API usage.
+</td>
+</tr>
+
+<!-- CLI entrypoint -->
+<tr>
+<td class="col-code"><code>if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("task", nargs="?", default="Profile the shipments.csv file for me.")
+    ap.add_argument("--no-skills", action="store_true", help="run without skills, for contrast")
+    ap.add_argument("--show-context", action="store_true")
+    args = ap.parse_args()
+
+    print(f"\n\033[1mTask:\033[0m {args.task}")
+    print(f"\n\033[1mSkills:\033[0m {'disabled' if args.no_skills else 'enabled'}")
+    run(args.task, not args.no_skills, args.show_context)</code></td>
+<td class="col-why">
+CLI entrypoint wiring:
+
+- task (positional or default): the user’s request.
+- --no-skills: disables skill loading to compare behavior with/without progressive disclosure.
+- --show-context: enables context/token accounting output.
+
+After echoing config, calls run() with appropriate flags; keeps concerns separated and script usable both interactively and in demos.
+</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+</html>

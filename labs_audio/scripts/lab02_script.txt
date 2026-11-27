@@ -1,0 +1,65 @@
+Lab Two. Structured output.
+
+This is the lab where a chatbot becomes a software component. It's worth being clear about why that matters before you sit down to it.
+
+A model that returns prose is something you talk to. Interesting, but you can't build on it. A model that reliably returns validated data, in a shape you specified in advance, is a function you can call from a program, put in a pipeline, and depend on. Everything else we do afterwards rests on this working. So it's a short lab with a lot riding on it.
+
+The scenario is deliberately ordinary. You've got incoming customer support emails, and you want each one turned into a record: who sent it, which company they're from, what the reference number is, how severe it is. The sort of thing a human does in ten seconds and a database needs in a specific format.
+
+Now, there are two ways to get structured data out of a model, and I need to tell you something about the difference, because the textbook answer has gone out of date.
+
+The first way is to ask for it in the prompt. Please reply with JSON, here are the fields. The second way is to declare your schema as a tool, and require the model to call it, so the arguments get validated before the response ever reaches your code.
+
+If you learned this topic a couple of years ago, you learned that the first way fails at parsing. Code fences around the output. A cheerful sentence before it. A trailing comma. A key renamed because the model thought of a better name.
+
+That is no longer true, and we measured it. On the cheapest model available, asking politely in the prompt returned clean, parseable data ninety times out of ninety. The defensive clean-up code in our own script, the bit that strips code fences off the reply, never ran once.
+
+So don't arrive expecting to watch that method fall over. It won't. And the honest case for declaring a schema is no longer about pass rates. It's that you get a guarantee of shape instead of a high probability, and you delete three lines of repair code you would otherwise maintain forever.
+
+Here's what you should expect instead, and it's more interesting. Across two hundred and forty extractions you will find exactly one wrong answer. It will be in the method you'd least expect. And it will be our fault, not the model's.
+
+Let me set up how that happens.
+
+The test data comes in two tiers. Tier one is clean: one sender, one company, an explicit reference number. Any capable model gets all of them right, and those exist so the lab opens with something that works.
+
+Tier two is ten emails, each setting one specific trap. One names three different companies, where the writer's own company isn't the most prominent. One mentions a colleague by name just before the signature. One has a customer insisting in capital letters that it is not urgent, while describing what is clearly a site wide outage. One contains an invoice number and an error code that both look like they could be ticket references. One quotes an old closed ticket below the new problem. One is written by an account manager on a client's behalf. One says the writer tried to Google the problem. One mentions a Dell monitor. One is written by somebody whose employer actually is the famous brand in the email. And one comes from a company whose name is also an everyday word.
+
+Six of those ten are company attribution traps. All six pass. On both models, every trial, with zero errors in two hundred and forty extractions. The thing everybody worries about turns out to be solved, and finding that out is worth the run on its own.
+
+Which leaves one failure, and it is the whole lab.
+
+It's the email written on somebody else's behalf, and the field that goes wrong is the reference number. The schema enforced method returns nothing for it, on every trial. The prompt based method gets it right every time. Same model, same email, same rules. The only difference is the schema.
+
+Sit with that for a second before you read on, because the answer is worth working out for yourself.
+
+The reason is that reference number is the only field in the schema allowed to be empty, and its description ends with the words "null if none", after listing three things not to count. So the schema taught the model that giving up was an acceptable answer, and on the one genuinely hard email, it took the option we had documented for it. Free text offers no such escape, which is why the other method never does this.
+
+Then you'll run two more versions of the same schema, and this is the part to pay attention to.
+
+The second version keeps the field exactly as it was, same type, still allowed to be empty. All that changes is the wording. The positive instruction comes first, the exclusions come second, and being empty is framed as the exception rather than an offer. That scores a hundred per cent. The defect simply disappears.
+
+The third version does the thing that feels more rigorous. It removes the option of being empty altogether, so the field must be filled. And it makes things worse, in two separate ways.
+
+The hard email fails again, but differently: the model now returns the four letters n-u-l-l, as a piece of text. It routed around the constraint. And a second email, one that passed perfectly well before, now fails too, because nine of the ten emails genuinely have no reference number, and we had just written a schema asserting that every one of them does. So the model invented placeholder text to comply.
+
+That's the sentence to take away. You cannot fix a prompt problem by tightening a type. You make the schema lie about the world, and the model lies back politely to satisfy it.
+
+And it reframes what the schema method actually is. It isn't the less capable path. Its accuracy is a property of how you wrote the schema. Compare the two instructions side by side in the lab and you'll see that the prompt version runs to about seven hundred characters with a worked example, and the schema description is a hundred and fifty with the example dropped and the escape hatch kept. The method wasn't the problem. Somebody compressed the instruction on the way into the schema, and that is the single most common mistake in writing tool definitions.
+
+Finally, the same task on your own hardware, which adds a third method the cloud version can't offer.
+
+Constrained decoding. Your schema gets compiled into a sampling grammar, and at every step, any token that would break the schema is masked out. It isn't discouraged from producing bad output. The bad output is not available to pick. A very small model physically cannot emit malformed data.
+
+And the local run produces the result that reframes the whole lab. On the hosted frontier model, the prompt based method wins and the schema method is very slightly behind. On the local twenty seven billion parameter model, it's the other way round: the schema method is perfect and the prompt based method drops. Same ten emails, same rules, opposite conclusion.
+
+The local model's failures are both the prompt method omitting a reference number that is present. Constrained, it finds them. Writing free prose, it leaves them out.
+
+So the mechanism is consistent. A constrained path forces attention onto every field, which the weaker model needs and the stronger one doesn't. Scaffolding helps whoever is struggling, and very slightly hinders whoever isn't. That's the argument for choosing per workload rather than per ideology, and by the end of the hour you'll have measured it rather than been told it.
+
+One last thing worth noticing: the rewritten schema description makes no difference at all on the local model. Byte identical numbers. Because every local failure is in the method that never sees the schema. A schema fix can only fix the schema path, which is obvious once said and easy to miss.
+
+Two sentences for the whiteboard. A schema guarantees the shape of an answer; its accuracy is a property of how you wrote the schema. And then the operational version: a malformed response is an outage, and you find out in minutes. A well formed wrong one is a data quality incident you discover three months later, and by then it's in every report you've sent.
+
+That second sentence is why Lab Eight exists. You cannot test your way out of that failure with a parser.
+
+That's Lab Two.

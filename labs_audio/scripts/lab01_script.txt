@@ -1,0 +1,53 @@
+Lab One. Your GPU, measured.
+
+This is the one lab that has to happen in the same room, gathered round a single machine. So it's worth knowing what it's for before you arrive.
+
+Everything else we do is about building things on top of a model. This hour is about the model as a piece of infrastructure: what your hardware can actually serve, how fast, and where it falls over. The goal is to stop treating inference as magic, and start treating it as capacity planning.
+
+One thing to get straight first, because the room will have both. There are two common ways to run a model on your own hardware: a model manager that handles downloading and swapping models for you, and the raw inference server underneath it. And that's the part worth knowing — the manager is built on the server. Same engine. The difference isn't speed, it's how much control you get. The manager is right on a laptop when you want to try five models this afternoon. The raw server is right when you're fitting one specific model onto one specific card, which is what the machine in this room is doing.
+
+So when we benchmark both and one looks faster, be careful about the conclusion. You won't be comparing engines. You'll be comparing a tuned deployment against sensible defaults. That's a more useful thing to learn, and a very easy mistake to make.
+
+There are four things you'll do, and then one test at the end that matters more than the other three put together.
+
+First, you'll look at the card. There's a monitoring tool that ships with the Nvidia drivers, and you'll leave it running in a second terminal for the whole hour, refreshing once a second. Watch it. Most of what this lab teaches is visible in that window and nowhere else.
+
+Second, the arithmetic — and this is where the lab has more in it than you'd expect.
+
+A model is a file full of numbers. If it has eight billion parameters and each one is stored in about four bits, holding the weights costs roughly four gigabytes. Parameters, times bits, divided by the eight bits in a byte. That's the one piece of arithmetic worth memorising.
+
+Two things complicate it. The first is that a quantisation label is not a bit count. A file marked as four-bit is usually a mixture, with the more sensitive tensors kept at six bits, so it lands nearer four point eight in practice. Don't trust the label.
+
+The second is bigger. Alongside the weights sits the key value cache, and that's the number almost nobody calculates. It's two, for keys and values, times the number of layers that use attention, times the number of key value heads, times the head dimension, times the bytes per number. That's the cost per token. Then you multiply by how long your context is.
+
+Do that sum and you get a result that stops the room. On an eight billion parameter model, at its full advertised context length, the cache alone comes to sixteen gigabytes. Larger than the weights. On its own, it fills an entire card.
+
+Here's the catch, and it's why there's a script for this. The three numbers that sum needs — layer count, key value head count, head dimension — are not printed by the obvious command. Ask your model manager to describe a model and you get parameters, quantisation and context length, and not one of the three things you actually need. They live in the file's metadata, and a script in the lab folder fetches them and does the whole calculation.
+
+Run it twice. Once as it comes, and once telling it the cache is three bits instead of sixteen. Watch the bottom row flip from "does not fit" to "fits". That single change is the most useful thing in the hour, because it explains how the machine in this room runs a twenty seven billion parameter model, at a context of nearly two hundred thousand tokens, on a card that by the simple arithmetic shouldn't manage it.
+
+That model has one more trick, because it breaks the tidy formula. It's a hybrid design: only every fourth layer uses full attention, so sixteen of its sixty four layers hold a cache that grows, and the other forty eight hold a fixed state that doesn't. Apply the simple formula and you'll overestimate by a factor of four. The lesson isn't that number. It's that the formula has preconditions, and checking them is the actual skill.
+
+Third, you'll measure it. The benchmark script reports two numbers that get confused constantly. Time to first token is how long before the user sees anything at all; that's what makes an interface feel responsive. Tokens per second is how fast the rest arrives; that's what makes it feel quick. You can have excellent time to first token and terrible throughput, or the reverse. Different problems, different fixes, and knowing which one you've got is the difference between fixing it and guessing.
+
+You don't all need to crowd round one keyboard for this, either — the benchmark talks to the server over the network, so you can run it from your own seat once your configuration points at the machine with the card. Write the numbers down. You'll want them later, when we compare running this yourself against paying someone per token.
+
+Fourth, and this is the fun one, you'll break it. Load a model that nearly fills the card, then start a second generation while the first is still running. Watch the memory fill in that monitoring window. When it's full, layers spill out into system memory and throughput collapses, often by a factor of ten or more.
+
+Here's the thing to look out for, and it's the real lesson. There is no error. Nothing crashes. Nothing logs a warning. It just gets slow. If you only ever watch for exceptions, you will never see this, and your users will find it before you do.
+
+Then the last twenty minutes, which sets up everything afterwards.
+
+You'll ask the model for structured output. Strict machine readable data, specific fields, five times in a row, with no constraints applied at all. Then count how often you get something a program could actually parse. This is the model unaided, which is the honest baseline.
+
+What to expect: it will not score five out of five. A small model will fail most attempts. It will wrap the output in code fences. It will add a cheerful sentence before it. It will invent an extra field you never asked for, or a severity level that wasn't in the list of allowed values. A larger model does noticeably better, and still not perfectly.
+
+Nothing will be perfect, and that's the point. Don't read it as a disappointing result. Read it as the measurement that justifies everything we build afterwards.
+
+And while you're watching those failures, sort them into two piles, because this is the question we'll pick up in the discussion. Some failures your code catches immediately: the data is malformed, parsing throws an error, you know about it. Others are perfectly well formed and quietly wrong — a plausible looking value, in the right field, that happens to be invented. The second kind is far worse, far more common, and almost nobody designs for it.
+
+Two more questions to arrive with. If one generation takes eight seconds on this card, how many people can you serve at once, and how deep does the queue get before somebody waits a full minute? And second: under what conditions is running this yourself genuinely cheaper than paying per token? Not "is it cheaper". What has to be true for it to be cheaper?
+
+The sentence we'll put on the whiteboard at the end is this one. Local inference is cheap per token, and expensive per unit of reliability. Paying for an API is the reverse. Choose per workload, not per ideology.
+
+That's Lab One. See you there.

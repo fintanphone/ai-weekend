@@ -26,7 +26,7 @@ import tickets as T
 
 load_dotenv()
 
-MODEL = os.environ.get("WORKSHOP_MODEL", "claude-sonnet-5")
+MODEL = os.environ.get("WORKSHOP_MODEL", "claude-haiku-5-5")
 client = anthropic.Anthropic()
 
 # Rebuilt by --schema. See the note above tickets.schema(): the lax variant

@@ -4,8 +4,17 @@ Two days, roughly 10:00–17:30 each. Times are deliberately generous. Everythin
 takes twice as long with an audience, and the conversations that break out
 mid-lab are usually more valuable than finishing on schedule.
 
-**Read `facilitator/FACILITATOR.md` before Saturday.** It has the cut-list for when you run
-behind, and you will run behind.
+**Read `facilitator/FACILITATOR.md` before Saturday.** It has the cut-list for
+when you run behind, and you will run behind.
+
+There is also an **optional Lab 9** (`labs/lab09_harness/`) which is not in the
+two-day plan. It turns Lab 3's loop into reusable infrastructure, and works
+either bolted onto Sunday or as the anchor of a third day.
+
+**Each session also has a briefing** — a script for the person at the front of
+the room, in that lab's folder as `BRIEFING.md`. They're indexed in
+[`labs/BRIEFINGS.md`](labs/BRIEFINGS.md). Read the Foundations and Lab 3
+briefings the week before; those two carry the weekend.
 
 ---
 

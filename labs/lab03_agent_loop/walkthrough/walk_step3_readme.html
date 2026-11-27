@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Code Walkthrough — step3_loop.py</title>
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                     "Segoe UI", sans-serif;
+        color: #e5e7eb;
+        background: radial-gradient(circle at 50% 30%, #111827 0%, #020617 100%);
+        padding: 24px 16px 60px;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    header {
+        margin-bottom: 18px;
+    }
+
+    h1 {
+        font-size: 1.45rem;
+        font-weight: 600;
+        color: #e5e7eb;
+        letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+        margin-top: 4px;
+        font-size: 0.84rem;
+        color: #6b7280;
+    }
+
+    /* Scroll wrapper */
+    .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid rgba(75,85,99,0.4);
+        background: #020617;
+    }
+
+    /* Thin custom scrollbar */
+    .table-wrap::-webkit-scrollbar { height: 6px; width: 6px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb {
+        background: #1f2933;
+        border-radius: 999px;
+    }
+
+    table {
+        width: 100%;
+        min-width: 960px;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        line-height: 1.45;
+    }
+
+    /* Sticky header */
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #0f172a;
+        color: #38bdf8;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 9px 14px 9px 14px;
+        border-bottom: 1px solid rgba(75,85,99,0.5);
+    }
+
+    thead th:first-child {
+        width: 46%;
+        text-align: left;
+    }
+
+    tbody td {
+        padding: 0;
+        border-bottom: 1px solid rgba(75,85,99,0.22);
+        vertical-align: top;
+    }
+
+    /* Alternating row backgrounds */
+    tbody tr:nth-child(even) {
+        background-color: rgba(15,23,42,0.32);
+    }
+
+    /* Hover tint */
+    tbody tr {
+        transition: background-color 0.18s ease;
+    }
+    tbody tr:hover {
+        background-color: rgba(56,189,248,0.05);
+    }
+
+    /* Code cell */
+    td.code-cell {
+        padding: 6px 0;
+        vertical-align: top;
+        width: 46%;
+    }
+
+    td.code-cell pre {
+        margin: 0;
+        font-family: SF Mono, Menlo, Consolas, "Liberation Mono",
+                     ui-monospace, monospace;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        background: #020817;
+        border-radius: 6px;
+        padding: 7px 9px 7px 9px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #e5e7eb;
+    }
+
+    /* Explanation cell */
+    td.expl-cell {
+        padding: 6px 14px 6px 12px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                     "Segoe UI", sans-serif;
+        color: #9ca3af;
+    }
+
+    td.expl-cell p + p {
+        margin-top: 4px;
+    }
+
+    /* Small utility */
+    .muted {
+        color: #6b7280;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+    <h1>Code Walkthrough — step3_loop.py</h1>
+    <div class="subtitle">A hand-built agent loop that lets a language model call tools on a Raspberry Pi, repeated until done or limited.</div>
+</header>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+    <th>Code</th>
+    <th style="text-align:left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- Shebang -->
+<tr>
+<td class="code-cell"><pre>#!/usr/bin/env python3</pre></td>
+<td class="expl-cell">Shebang: lets this file be run directly from a terminal as an executable Python 3 script.</td>
+</tr>
+
+<!-- Top comment block -->
+<tr>
+<td class="code-cell"><pre># =============================================================================
+#  STEP 3 of 4  —  THE SAME THING, AS A LOOP
+# =============================================================================
+#
+#  Step 2 wrote out three nearly-identical turns and ended with an "if" in case
+#  a fourth was needed. This file replaces all of that with a while-loop.
+#
+#  Nothing new happens here. No new idea, no new API, no new tool. The only
+#  change is that the repetition is written once instead of three times.
+#
+#  THAT IS THE WHOLE LESSON OF LAB 3. An agent is a while-loop around a model
+#  that can call functions. You have now built one by hand and watched it
+#  collapse into fifteen lines.
+...
+</pre></td>
+<td class="expl-cell">
+    <p>Pedagogical header: this script (step 3) refactors the previous "unrolled" agent turns into a single loop.</p>
+    <p>Core lesson stated explicitly: an agent is fundamentally a loop that repeatedly calls a model, lets it request tool use, runs those tools, and feeds results back—until done or stopped.</p>
+</td>
+</tr>
+
+<!-- Imports -->
+<tr>
+<td class="code-cell"><pre>import json
+import requests
+
+import pi_tools</pre></td>
+<td class="expl-cell">
+    <p><span style="color:#38bdf8;">json:</span> parse/serialize JSON payloads (for tool arguments and responses).</p>
+    <p><span style="color:#38bdf8;">requests:</span> HTTP client used to call the local LLM API endpoint.</p>
+    <p><span style="color:#38bdf8;">pi_tools:</span> custom module that defines:
+        <ul style="margin-left:16px;margin-top:2px;">
+            <li>Schemas for available tools (LIST_FILES, DELETE_FILE),</li>
+            <li>A dispatcher mapping tool names → actual Python functions,</li>
+            <li>The real filesystem/network operations on the Pi.</li>
+        </ul>
+    </p>
+</td>
+</tr>
+
+<!-- Config flags -->
+<tr>
+<td class="code-cell"><pre>PAUSE = True
+SERVER = "http://localhost:8080"
+MAX_TURNS = 8               # the circuit breaker. See the note at the bottom.</pre></td>
+<td class="expl-cell">
+    <p><span style="color:#38bdf8;">PAUSE:</span> when True, prompts the user to press Enter between important steps so you can read along (teaching mode).</p>
+    <p><span style="color:#38bdf8;">SERVER:</span> base URL of the local LLM inference server exposing an OpenAI-style /v1/chat/completions endpoint.</p>
+    <p><span style="color:#38bdf8;">MAX_TURNS:</span> safety limit on loop iterations—prevents runaway looping and expensive/unbounded tool use.</p>
+</td>
+</tr>
+
+<!-- pause helper -->
+<tr>
+<td class="code-cell"><pre>def pause(note):
+    print()
+    print("    " + "-" * 66)
+    if PAUSE:
+        input("    >>> " + note + "   (press Enter to continue) ")
+    else:
+        print("    >>> " + note)
+    print("    " + "-" * 66)
+    print()</pre></td>
+<td class="expl-cell">
+    <p>Utility for readable, stepwise output:</p>
+    <ul style="margin-left:16px;">
+        <li>If PAUSE is True, blocks at input() so the reader can inspect output before continuing.</li>
+        <li>If PAUSE is False, just prints the note (useful in automated or fast runs).</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Task definition -->
+<tr>
+<td class="code-cell"><pre>task = ("Log on to the Pi, go to my home directory, find all the .tmp files "
+        "and delete the largest one if there is one.")</pre></td>
+<td class="expl-cell">
+    <p>Human task description as a natural-language prompt. This file’s agent will attempt this exact instruction using available tools.</p>
+</td>
+</tr>
+
+<!-- System prompt -->
+<tr>
+<td class="code-cell"><pre>system_prompt = ("You are a careful assistant with access to a Raspberry Pi. "
+                 "Use the tools rather than guessing. When the task is done, "
+                 "say so in one sentence and stop calling tools.")</pre></td>
+<td class="expl-cell">
+    <p>System message: sets behavior rules for the model:</p>
+    <ul style="margin-left:16px;">
+        <li>Don’t guess—use provided tools.</li>
+        <li>Announce completion concisely and stop requesting tools when done.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Initialize conversation -->
+<tr>
+<td class="code-cell"><pre>messages = []
+messages.append({"role": "system", "content": system_prompt})
+messages.append({"role": "user", "content": task})</pre></td>
+<td class="expl-cell">
+    <p>Builds the initial conversation history:
+        <ul style="margin-left:16px;">
+            <li><span style="color:#38bdf8;">system:</span> behavioral instructions.</li>
+            <li><span style="color:#38bdf8;">user:</span> the actual task to perform.</li>
+        </ul>
+    This history is sent in full each turn so the model always sees context.
+    </p>
+</td>
+</tr>
+
+<!-- Tools -->
+<tr>
+<td class="code-cell"><pre>tools = []
+tools.append(pi_tools.LIST_FILES_SCHEMA)
+tools.append(pi_tools.DELETE_FILE_SCHEMA)</pre></td>
+<td class="expl-cell">
+    <p>Define available tools as schemas the model understands (OpenAI-style function/tool definitions). Here:</p>
+    <ul style="margin-left:16px;">
+        <li><span style="color:#38bdf8;">LIST_FILES_SCHEMA:</span> list directory contents.</li>
+        <li><span style="color:#38bdf8;">DELETE_FILE_SCHEMA:</span> delete a specific file.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Counters -->
+<tr>
+<td class="code-cell"><pre>tokens_sent_total = 0
+tools_run_total = 0</pre></td>
+<td class="expl-cell">
+    <p>Accumulators for transparency: track total prompt tokens sent across all turns and how many tool calls were executed.</p>
+</td>
+</tr>
+
+<!-- Print task -->
+<tr>
+<td class="code-cell"><pre>print("TASK")
+print("   " + task)
+print()
+
+pause("Here comes the loop. Put a breakpoint on the 'for turn' line.")</pre></td>
+<td class="expl-cell">
+    <p>Echoes the task for visibility, then pauses so you can set a debugger breakpoint before entering the main agent loop.</p>
+</td>
+</tr>
+
+<!-- Main loop header -->
+<tr>
+<td class="code-cell"><pre>final_answer = "(the loop ended without an answer)"
+
+for turn in range(1, MAX_TURNS + 1):
+
+    print("=" * 72)
+    print("TURN", turn)
+    print("=" * 72)</pre></td>
+<td class="expl-cell">
+    <p>Main agent loop:</p>
+    <ul style="margin-left:16px;">
+        <li><span style="color:#38bdf8;">final_answer</span> defaults to a placeholder; updated when the model provides a terminal response.</li>
+        <li>Loop runs from 1 to MAX_TURNS inclusive; each iteration is one "turn" of agent reasoning + possible tool use.</li>
+        <li>Prints a header for readability and debugging.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Build request body -->
+<tr>
+<td class="code-cell"><pre>body = {
+    "model": "local-model",
+    "messages": messages,
+    "tools": tools,
+    "temperature": 0.0,
+    "max_tokens": 800,
+    "chat_template_kwargs": {"enable_thinking": False},
+    "reasoning_budget": 0,
+}</pre></td>
+<td class="expl-cell">
+    <p>Constructs the HTTP request body for the LLM:</p>
+    <ul style="margin-left:16px;">
+        <li><span style="color:#38bdf8;">model:</span> identifier for the local model to use.</li>
+        <li><span style="color:#38bdf8;">messages:</span> full conversation history (grows each turn).</li>
+        <li><span style="color:#38bdf8;">tools:</span> schemas of callable tools the model may request.</li>
+        <li><span style="color:#38bdf8;">temperature 0.0:</span> deterministic; minimize randomness for reliability in tool use.</li>
+        <li><span style="color:#38bdf8;">max_tokens 800:</span> cap on response length per turn.</li>
+        <li><span style="color:#38bdf8;">enable_thinking / reasoning_budget:</span> disable internal "thinking" steps to keep responses direct and cheaper.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- HTTP call -->
+<tr>
+<td class="code-cell"><pre>http_reply = requests.post(SERVER + "/v1/chat/completions", json=body, timeout=180)
+http_reply.raise_for_status()
+data = http_reply.json()</pre></td>
+<td class="expl-cell">
+    <p>Sends the request to the local LLM via an OpenAI-compatible chat completions endpoint:</p>
+    <ul style="margin-left:16px;">
+        <li><span style="color:#38bdf8;">timeout=180</span> allows up to 3 minutes for large/slow generations.</li>
+        <li><span style="color:#38bdf8;">raise_for_status()</span> fails fast on HTTP errors (5xx, etc.).</li>
+        <li>Parses JSON response into data.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Token accounting -->
+<tr>
+<td class="code-cell"><pre>tokens_sent_total = tokens_sent_total + data.get("usage", {}).get("prompt_tokens", 0)</pre></td>
+<td class="expl-cell">
+    <p>Accumulates prompt (input) token usage from the model’s response metadata. Helps monitor cost and context growth; uses .get() to avoid breaking if fields are absent.</p>
+</td>
+</tr>
+
+<!-- Extract reply -->
+<tr>
+<td class="code-cell"><pre>choice = data["choices"][0]
+reply = choice["message"]
+finish_reason = choice["finish_reason"]</pre></td>
+<td class="expl-cell">
+    <p>Parses the assistant's response: takes first (and typically only) choice, extracts its message content and finish_reason to decide what to do next.</p>
+</td>
+</tr>
+
+<!-- Print model text -->
+<tr>
+<td class="code-cell"><pre>if reply.get("content"):
+    print("   " + reply["content"].strip())</pre></td>
+<td class="expl-cell">
+    <p>If the model produced natural-language text (e.g., explaining steps), prints it for visibility.</p>
+</td>
+</tr>
+
+<!-- Check finish_reason -->
+<tr>
+<td class="code-cell"><pre>if finish_reason != "tool_calls":
+    final_answer = reply.get("content") or "(no answer given)"
+    print()
+    print("   finish_reason is", repr(finish_reason), "- no tool wanted - the loop ends.")
+    break</pre></td>
+<td class="expl-cell">
+    <p>Key decision point:</p>
+    <ul style="margin-left:16px;">
+        <li>If finish_reason is not "tool_calls", the model believes it is done (e.g., gave final answer) or stopped for another reason.</li>
+        <li>We capture its text as final_answer and break out of the loop—no more turns needed.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Append assistant message -->
+<tr>
+<td class="code-cell"><pre>messages.append(reply)</pre></td>
+<td class="expl-cell">
+    <p>Critical: append the model’s last turn (including its tool_calls) to messages so future calls see what it asked for. Without this, each request looks like a fresh start and coherence breaks.</p>
+</td>
+</tr>
+
+<!-- Tool execution loop -->
+<tr>
+<td class="code-cell"><pre>for tool_call in reply["tool_calls"]:
+
+    name = tool_call["function"]["name"]
+    arguments = json.loads(tool_call["function"]["arguments"])
+
+    print("   -> " + name + "(" + json.dumps(arguments) + ")")</pre></td>
+<td class="expl-cell">
+    <p>If the model requested tools:</p>
+    <ul style="margin-left:16px;">
+        <li>Iterate over each tool_call in its response.</li>
+        <li>Extract the function name and its JSON-encoded arguments, then parse them into a Python dict.</li>
+        <li>Log what’s about to be called for transparency.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Dispatch -->
+<tr>
+<td class="code-cell"><pre>function = pi_tools.DISPATCH.get(name)
+if function is None:
+    output = "ERROR: no such tool: " + name
+else:
+    output = function(**arguments)</pre></td>
+<td class="expl-cell">
+    <p>Uses a simple dispatch map (name → actual callable). If unknown, returns an error string instead of crashing—keeps the agent alive and honest about what’s allowed.</p>
+</td>
+</tr>
+
+<!-- Count tools -->
+<tr>
+<td class="code-cell"><pre>tools_run_total = tools_run_total + 1</pre></td>
+<td class="expl-cell">
+    <p>Increment total tool executions for final stats and observability.</p>
+</td>
+</tr>
+
+<!-- Print output -->
+<tr>
+<td class="code-cell"><pre>for line in output.splitlines()[:6]:
+    print("   <- " + line)</pre></td>
+<td class="expl-cell">
+    <p>Prints up to the first 6 lines of tool output so you can see what happened without flooding the terminal.</p>
+</td>
+</tr>
+
+<!-- Append tool result -->
+<tr>
+<td class="code-cell"><pre>messages.append({
+    "role": "tool",
+    "tool_call_id": tool_call["id"],
+    "content": output,
+})</pre></td>
+<td class="expl-cell">
+    <p>Essential: feeds the result back into the conversation as a “tool” role message linked via tool_call_id. The model uses this to understand consequences of its actions and decide next steps.</p>
+</td>
+</tr>
+
+<!-- Loop status -->
+<tr>
+<td class="code-cell"><pre>print()
+print("   messages:", len(messages), "items     tokens sent:", tokens_sent_total)
+print()</pre></td>
+<td class="expl-cell">
+    <p>Logs context size and cumulative token usage each turn so you can see how the conversation grows—useful for debugging and cost awareness.</p>
+</tr>
+
+<!-- Else (turn limit) -->
+<tr>
+<td class="code-cell"><pre>else:
+    print()
+    print("   Hit the turn limit of", MAX_TURNS, "without finishing.")</pre></td>
+<td class="expl-cell">
+    <p>Python’s for…else: if the loop completes without break, this runs—meaning we exceeded MAX_TURNS before the model signaled done. Acts as a safety notice.</p>
+</td>
+</tr>
+
+<!-- Final summary -->
+<tr>
+<td class="code-cell"><pre>print()
+print("=" * 72)
+print("ANSWER")
+print("=" * 72)
+print()
+for line in final_answer.strip().splitlines():
+    print("   " + line)
+print()
+print("   turns taken   :", turn)
+print("   tools run     :", tools_run_total)
+print("   tokens sent   :", tokens_sent_total)
+print("   final messages:", len(messages))</pre></td>
+<td class="expl-cell">
+    <p>Prints: the model’s final answer, plus a concise summary of:</p>
+    <ul style="margin-left:16px;">
+        <li>How many turns were needed.</li>
+        <li>How many tool calls it made.</li>
+        <li>Total tokens sent and conversation length at the end.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Final pause -->
+<tr>
+<td class="code-cell"><pre>pause("Scroll up. Count the lines in the loop. It is about fifteen.")</pre></td>
+<td class="expl-cell">
+    <p>Pedagogical nudge: highlights that an entire agent loop—request, tool use, observe—is implemented in a very small amount of code.</p>
+</tr>
+
+<!-- Bottom commentary block -->
+<tr>
+<td class="code-cell"><pre># =============================================================================
+#  WHAT TO TAKE AWAY
+... (educational notes) ...
+# =============================================================================</pre></td>
+<td class="expl-cell">
+    <p>Not executable; summarizes core ideas:</p>
+    <ul style="margin-left:16px;">
+        <li>The agent pattern is five basic steps repeated.</li>
+        <li>Taking away the turn limit is dangerous—runaway loops cost money and take actions.</li>
+        <li>No explicit planning/branching code needed; model figures out order from tools + task.</li>
+    </ul>
+</td>
+</tr>
+
+<!-- Next step hint -->
+<tr>
+<td class="code-cell"><pre>print()
+print("Next:  python step4_guardrails.py")
+print()</pre></td>
+<td class="expl-cell">
+    <p>Informs the learner about the next script in the sequence (step 4), which adds safety/guardrails on top of this loop.</p>
+</tr>
+
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>
